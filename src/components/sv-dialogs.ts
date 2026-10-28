@@ -143,7 +143,7 @@ export class SvDialogs extends SvElement {
             <div><div class="sv-title-medium">${f.title}</div><div class="sv-body-medium sv-muted">${f.desc}</div></div>
           </div>`)}
         </div>
-        <div slot="actions" class="sv-row-between sv-full">
+        <div slot="actions" class="sv-row-between sv-full sv-whatsnew-actions">
           <label class="sv-check"><m3e-checkbox ?checked=${this.neverShow} @change=${(e: Event) => (this.neverShow = (e.target as unknown as { checked: boolean }).checked)}></m3e-checkbox>Don’t show again until the next update</label>
           <m3e-button variant="filled"><m3e-dialog-action>Got it</m3e-dialog-action></m3e-button>
         </div>

@@ -16,6 +16,8 @@ const SUN = '#f2b705';
 const RAIN = '#4f8ef5';
 const NIGHT = '#5b5bd6';
 const FPS = 30;
+/** The scene is laid out for a hero at least this wide; narrower heroes scale it down. */
+const DESIGN_WIDTH = 360;
 
 type Kind =
   | 'clear-day' | 'clear-night' | 'partly-day' | 'partly-night' | 'cloudy' | 'fog'
@@ -372,8 +374,12 @@ export class SvScene extends SvElement {
     const g = this.canvas.getContext('2d');
     if (!g) return;
     const dpr = this.canvas.width / Math.max(1, this.getBoundingClientRect().width);
-    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const cssW = this.canvas.width / dpr, cssH = this.canvas.height / dpr;
+    // On narrow phones (or with Display Zoom) the sun and clouds would run into the
+    // temperature; shrink the whole scene uniformly instead.
+    const k = Math.min(1, cssW / DESIGN_WIDTH);
+    g.setTransform(dpr * k, 0, 0, dpr * k, 0, 0);
     const t = reducedMotion.matches ? 2 : (performance.now() - this.start) / 1000;
-    draw(g, this.canvas.width / dpr, this.canvas.height / dpr, this.info, t);
+    draw(g, cssW / k, cssH / k, this.info, t);
   }
 }

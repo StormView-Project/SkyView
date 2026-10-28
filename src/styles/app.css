@@ -187,7 +187,8 @@ sv-map { position: absolute; inset: 0; display: block; }
 @keyframes sv-slide-in-right { from { transform: translateX(40px); opacity: 0; } }
 
 .sv-sidebar-head { display: flex; align-items: center; gap: 6px; padding: 10px 10px 6px 6px; min-height: 60px; }
-.sv-loc-btn { --m3e-text-button-label-text-color: var(--md-sys-color-on-surface); max-width: 230px; }
+.sv-loc-btn { --m3e-text-button-label-text-color: var(--md-sys-color-on-surface); flex: 0 1 auto; min-width: 0; max-width: 100%; overflow: hidden; }
+.sv-sidebar-head > :not(.sv-loc-btn) { flex: none; }
 .sv-loc-name { font-weight: 700; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sv-loc-state { margin-left: 6px; color: var(--md-sys-color-on-surface-variant); }
 .sv-sidebar-body { flex: 1; padding: 4px 12px 16px; }
@@ -237,7 +238,7 @@ m3e-card.sv-widget {
 .sv-widget-icon { --m3e-icon-size: 20px; color: var(--md-sys-color-primary); }
 .sv-widget-title { flex: 1; font-size: 14px; font-weight: 700; letter-spacing: 0.4px; color: var(--md-sys-color-on-surface-variant); text-transform: none; }
 
-.sv-two-up { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.sv-two-up { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .sv-stat-tile { display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 20px; }
 .sv-stat-tile m3e-icon { --m3e-icon-size: 28px; }
 .sv-stat-tile--neutral { flex-direction: column; align-items: flex-start; gap: 2px; background: var(--md-sys-color-surface-container-low); }
@@ -250,7 +251,7 @@ m3e-card.sv-widget {
 .sv-meter { height: 12px; border-radius: 8px; background: var(--md-sys-color-surface-container-low); overflow: hidden; }
 .sv-meter-fill { height: 100%; border-radius: 8px; transition: width 600ms var(--sv-spring); }
 
-.sv-kv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.sv-kv-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .sv-kv { display: flex; justify-content: space-between; gap: 8px; padding: 10px 12px; border-radius: 14px; background: var(--md-sys-color-surface-container-low); font-size: 13px; }
 .sv-kv span { color: var(--md-sys-color-on-surface-variant); }
 .sv-kv small { font-weight: 400; color: var(--md-sys-color-on-surface-variant); }
@@ -275,7 +276,8 @@ m3e-card.sv-widget {
 .sv-hour-temp { position: absolute; left: 0; right: 0; text-align: center; }
 
 /* Tiles inside dialogs and day detail */
-.sv-tile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.sv-tile-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.sv-tile > div { min-width: 0; overflow-wrap: break-word; }
 .sv-tile { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 16px; background: var(--md-sys-color-surface-container-highest); }
 .sv-tile-icon { display: grid; place-items: center; width: 36px; height: 36px; flex: none; border-radius: 12px; --m3e-icon-size: 20px; }
 
@@ -378,10 +380,15 @@ m3e-card.sv-detail { --m3e-card-padding: 0; --m3e-card-shape: 18px; --m3e-filled
 .sv-scrubber-progress { display: flex; align-items: center; gap: 10px; color: var(--md-sys-color-on-surface-variant); }
 .sv-scrubber-progress m3e-linear-progress-indicator { flex: 1; }
 .sv-scrubber-top { display: flex; align-items: center; gap: 10px; }
-.sv-scrubber-time { flex: 1; min-width: 0; text-align: center; white-space: nowrap; }
+.sv-scrubber-time { flex: 1 1 0; min-width: 0; text-align: center; white-space: nowrap; overflow: hidden; }
+.sv-scrubber-time > * { overflow: hidden; text-overflow: ellipsis; }
+.sv-scrubber-date { display: flex; align-items: center; justify-content: center; gap: 6px; }
+.sv-scrubber-date .sv-chip { height: 18px; padding: 0 6px; font-size: 10.5px; border-radius: 6px; flex: none; }
+.sv-scrubber-top > :not(.sv-scrubber-time) { flex: none; }
+.sv-now-compact { display: none; }
 .sv-speed-cycle { display: none; }
 .sv-scrubber-clock {
-  display: inline-flex; align-items: center; gap: 8px; font-size: 22px; line-height: 28px;
+  display: block; font-size: 22px; line-height: 28px;
   font-variation-settings: 'wght' 650, 'wdth' 105, 'ROND' 100; font-feature-settings: 'tnum';
 }
 .sv-timeline { position: relative; height: 44px; margin: 0 8px; cursor: pointer; touch-action: none; outline: none; }
@@ -492,6 +499,7 @@ m3e-dialog.sv-dialog--wide { --m3e-dialog-max-width: min(680px, 94vw); }
 .sv-dialog-head m3e-icon { color: var(--md-sys-color-primary); }
 m3e-dialog .sv-tile-grid, m3e-dialog .sv-two-up, m3e-dialog .sv-bars, m3e-dialog m3e-divider, m3e-dialog m3e-callout, m3e-dialog > p, m3e-dialog > m3e-button { margin: 8px 0; }
 .sv-hour-summary { display: flex; align-items: center; gap: 16px; margin: 4px 0 12px; }
+.sv-hour-head { flex-direction: column; align-items: flex-start; gap: 0; }
 .sv-hour-summary m3e-shape { display: grid; place-items: center; }
 .sv-alert-cards { display: flex; flex-direction: column; gap: 12px; }
 .sv-alert-card { display: flex; flex-direction: column; gap: 8px; padding: 16px; border-radius: 24px; }
@@ -501,7 +509,9 @@ m3e-dialog .sv-tile-grid, m3e-dialog .sv-two-up, m3e-dialog .sv-bars, m3e-dialog
 .sv-welcome { --m3e-dialog-max-width: 440px; }
 .sv-welcome-hero { display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center; padding: 12px 8px 0; }
 .sv-welcome-shape { display: grid; place-items: center; }
-.sv-welcome-actions { display: flex; justify-content: flex-end; gap: 8px; width: 100%; }
+.sv-welcome-actions { display: flex; flex-wrap: wrap-reverse; justify-content: flex-end; gap: 8px; width: 100%; }
+.sv-whatsnew-actions { flex-wrap: wrap; row-gap: 12px; }
+.sv-whatsnew-actions > m3e-button { margin-left: auto; }
 .sv-whatsnew { display: flex; flex-direction: column; gap: 14px; }
 .sv-whatsnew-item { display: flex; gap: 14px; align-items: flex-start; }
 .sv-whatsnew-item m3e-shape { display: grid; place-items: center; flex: none; }
@@ -535,6 +545,11 @@ m3e-dialog .sv-tile-grid, m3e-dialog .sv-two-up, m3e-dialog .sv-bars, m3e-dialog
 .sv-chat-log { flex: 1; padding: 8px 16px; display: flex; flex-direction: column; gap: 8px; }
 .sv-chat-empty { display: flex; flex-direction: column; gap: 12px; padding-top: 16px; }
 .sv-msg { max-width: 86%; padding: 10px 14px; border-radius: 20px; font-size: 14px; line-height: 20px; white-space: pre-wrap; animation: sv-pop 300ms var(--sv-spring) both; }
+.sv-msg--assistant { white-space: normal; }
+.sv-msg p, .sv-msg ul, .sv-msg ol { margin: 0; }
+.sv-msg p + *, .sv-msg ul + *, .sv-msg ol + * { margin-top: 8px; }
+.sv-msg ul, .sv-msg ol { padding-left: 20px; display: flex; flex-direction: column; gap: 2px; }
+.sv-msg strong { font-weight: 700; }
 .sv-msg--user { align-self: flex-end; background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); border-bottom-right-radius: 6px; }
 .sv-msg--assistant { align-self: flex-start; background: var(--md-sys-color-surface-container-highest); border-bottom-left-radius: 6px; }
 .sv-chat-input { display: flex; align-items: center; gap: 8px; padding: 8px 12px 12px; }
@@ -617,6 +632,16 @@ m3e-card.sv-preview-card { --m3e-card-padding: 0; --m3e-card-shape: 28px; overfl
   .sv-scrubber-top { gap: 6px; }
   .sv-speeds, .sv-radar-refresh { display: none; }
   .sv-speed-cycle { display: inline-flex; min-width: 48px; }
+}
+@media (max-width: 360px) {
+  .sv-now { display: none; }
+  .sv-now-compact { display: inline-flex; }
+  .sv-scrubber-top { gap: 4px; }
+  .sv-scrubber-clock { font-size: 16px; line-height: 22px; }
+  .sv-scrubber-date.forecast .sv-date-text { display: none; }
+}
+@media (max-width: 400px) {
+  .sv-weekday { display: none; }
   .sv-scrubber-clock { font-size: 18px; }
   .sv-scrubber-legend { display: none; }
   .sv-hero-number { font-size: 92px; }
@@ -650,4 +675,50 @@ m3e-card.sv-detail, m3e-card.sv-preview-card { transition: border-radius 300ms v
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition-duration: 0s !important; }
+}
+
+/* ------------------------------------------- phones, Display Zoom, big text
+   Display Zoom (iOS) and larger display-size settings (Android) make a phone
+   report a narrower screen — a zoomed iPhone 13 is 320px wide — so everything
+   here is tuned to still fit at 320px. */
+@media (max-width: 760px) {
+  /* Room under the last section so the assistant button never covers it. */
+  .sv-compact-home { padding-bottom: 88px; }
+  /* The hero follows its content; the scene fills whatever height that is. */
+  .sv-hero--scene { min-height: 176px; padding: 12px 16px 16px; }
+  .sv-hero-number { font-size: 84px; }
+  .sv-hero-condition { font-size: 22px; line-height: 28px; margin-top: 4px; }
+  .sv-hero-chips { margin-top: 10px; gap: 6px; }
+  /* Two columns of detail cards instead of one tall single-column list. */
+  .sv-details-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sv-detail-inner { padding: 10px; }
+  /* Dialogs: m3e pads with this system token; 24px leaves a narrow text column. */
+  m3e-dialog.sv-dialog { --md-sys-measurement-space300: 16px; }
+  .sv-alert-card { padding: 12px; }
+  /* Settings sheet sits flush on the nav bar: no rounded corners for the map to peek through. */
+  .sv-app[data-compact='true'] .sv-sheet, .sv-app[data-compact='true'] .sv-sheet[data-side='left'] { border-radius: 0; }
+}
+@media (max-width: 400px) {
+  .sv-sidebar-head { gap: 2px; padding-right: 4px; }
+  .sv-loc-state { display: none; }
+  .sv-chip--secondary { padding: 0 8px; }
+  /* Sun tiles: times on one line. */
+  .sv-stat-tile { padding: 12px; gap: 8px; }
+  .sv-stat-tile .sv-title-large { font-size: 18px; line-height: 24px; white-space: nowrap; }
+  .sv-stat-tile m3e-icon { --m3e-icon-size: 22px; }
+  /* Segmented buttons: drop the decorative icons so labels fit ("Syst…", "Li…"). */
+  .sv-seg m3e-button-segment > m3e-icon[slot='icon'] { display: none; }
+  .sv-seg { --m3e-segmented-button-padding-start: 8px; --m3e-segmented-button-padding-end: 8px; --m3e-segmented-button-with-icon-padding-start: 6px; --m3e-segmented-button-font-size: 13px; }
+  /* Tiles in dialogs and 7-day rows. */
+  .sv-tile { padding: 8px; gap: 8px; }
+  .sv-tile-icon { width: 30px; height: 30px; border-radius: 10px; --m3e-icon-size: 18px; }
+  .sv-day-detail { padding: 0 8px 8px; }
+  .sv-day-detail .sv-tile { flex-direction: column; align-items: flex-start; gap: 6px; }
+  .sv-display-small { font-size: 30px; line-height: 36px; }
+  /* Widget list: tighter rows so names stay on one line. */
+  .sv-widget-list { --m3e-list-item-padding-inline: 4px; --m3e-list-item-between-space: 10px; --m3e-list-item-font-size: 15px; }
+  .sv-reorder m3e-icon-button { --m3e-icon-button-icon-size: 20px; }
+  /* Assistant header on one line. */
+  .sv-chat-title .sv-title-medium { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sv-chat-head { gap: 8px; padding-left: 12px; }
 }

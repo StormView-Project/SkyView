@@ -79,7 +79,7 @@ function segmented<T extends string | number>(opts: { label: string; value: T; i
 
 @customElement('sv-settings')
 export class SvSettings extends SvElement {
-  protected watch = new StoreController(this, (st) => [st.settingsOpen, st.settingsTab, st.isDark, st.tokens, ...SETTINGS_KEYS.map((k) => st[k])]);
+  protected watch = new StoreController(this, (st) => [st.settingsOpen, st.settingsTab, st.isDark, st.tokens, st.isNarrow, ...SETTINGS_KEYS.map((k) => st[k])]);
 
   @state() private query = '';
   @state() private results: Place[] = [];
@@ -297,7 +297,7 @@ export class SvSettings extends SvElement {
       ${group('Map', row('Base map', segmented([{ label: 'Material', value: 'material', icon: 'palette' }, { label: 'Streets', value: 'streets', icon: 'map' }], s.mapStyle, (v) => set({ mapStyle: v })), 'Material repaints the map with your color scheme.', true))}
 
       ${group('Layout', [
-        row('Sidebar position', segmented([{ label: 'Left', value: 'left' }, { label: 'Right', value: 'right' }], s.sidebarPosition, (v) => set({ sidebarPosition: v })), undefined, true),
+        s.isNarrow && s.compactLayout ? nothing : row('Sidebar position', segmented([{ label: 'Left', value: 'left' }, { label: 'Right', value: 'right' }], s.sidebarPosition, (v) => set({ sidebarPosition: v })), undefined, true),
         toggle('Phone layout', s.compactLayout, (v) => set({ compactLayout: v }), 'On phones and narrow windows, use a scrollable weather page with a navigation bar instead of the map + sidebar.'),
         toggle('Animated weather scene', s.weatherScene, (v) => set({ weatherScene: v }), 'Show the current conditions as a gentle animation behind the temperature — sun, drifting clouds, rain, snow, fog and lightning.'),
       ])}

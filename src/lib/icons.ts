@@ -1,17 +1,26 @@
-import { M3eIconElement } from '@m3e/web/icon';
+import { M3eIconElement, registerIcon } from '@m3e/web/icon';
+import svgIcons from '../assets/icons/material-symbols-rounded.json';
 import './icons.css';
 
 /*
- * <m3e-icon> defaults to the "Material Symbols Outlined" font, but SkyView ships
- * (and is designed around) Material Symbols *Rounded*. Without this, icons only
- * worked on machines that happen to have Outlined installed system-wide; phones
- * showed the icon's text name ("bedtime" → "be") instead.
- *
- * The `variant` setter is wrapped (lifecycle callbacks can't be patched: the
- * custom-element registry caches them at define time), so the constructor's
- * "outlined" default becomes "rounded" for every icon without an explicit
- * `variant` attribute — including icons m3e components render in their own
- * shadow DOM.
+ * Icons render as SVG, not font text. As text, the glyph's position depends on
+ * each platform's font metrics, and iOS drew every icon up and to the left of
+ * its box. An SVG fills its 1em box exactly everywhere. The paths are generated
+ * from Material Symbols Rounded by scripts/build-icon-font.py; the subset font in
+ * icons.css stays as a fallback for any name that isn't registered.
+ */
+const viewBox = '0 -960 960 960'; // Material's standard icon box: the font's 960-unit em, y flipped
+for (const [name, [outlined, filled]] of Object.entries(svgIcons as unknown as Record<string, [string, string]>)) {
+  registerIcon(name, 'rounded', { outlined: { viewBox, path: outlined }, filled: { viewBox, path: filled } });
+}
+
+/*
+ * <m3e-icon> defaults to the "outlined" variant, but SkyView's icons are
+ * Material Symbols *Rounded*. The `variant` setter is wrapped (lifecycle
+ * callbacks can't be patched: the custom-element registry caches them at define
+ * time), so the constructor's "outlined" default becomes "rounded" for every
+ * icon without an explicit `variant` attribute — including icons m3e components
+ * render in their own shadow DOM.
  */
 const proto = M3eIconElement.prototype;
 const desc = Object.getOwnPropertyDescriptor(proto, 'variant');

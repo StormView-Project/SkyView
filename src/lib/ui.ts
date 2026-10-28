@@ -27,6 +27,15 @@ export async function copyText(text: string) {
   await navigator.clipboard.writeText(text);
 }
 
+/**
+ * `@beforeinput` handler for M3E toggle buttons whose `selected` state comes from
+ * the store. Left alone, the button flips its own `selected` on every click while
+ * the click handler flips the store too: two copies of the same state that drift
+ * apart (e.g. on a quick double tap) and then stay inverted. Cancelling the
+ * button's own toggle leaves the store as the only source of truth.
+ */
+export const stateDriven = (e: Event) => e.preventDefault();
+
 /** Reads `.value` / `.checked` from M3E form controls in event handlers. */
 export const valueOf = (e: Event) => (e.target as unknown as { value: string }).value;
 export const checkedOf = (e: Event) => (e.target as unknown as { checked: boolean }).checked;

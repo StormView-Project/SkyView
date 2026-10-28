@@ -3,7 +3,7 @@ import { customElement, query, state } from 'lit/decorators.js';
 import { format } from 'date-fns';
 import { jumpToNow, refreshRadar } from '../lib/data';
 import { store, StoreController } from '../lib/store';
-import { SvElement } from '../lib/ui';
+import { stateDriven, SvElement } from '../lib/ui';
 
 const SPEEDS = [0.5, 1, 2] as const;
 
@@ -89,7 +89,8 @@ export class SvScrubber extends SvElement {
             toggle
             ?selected=${playing}
             aria-label=${playing ? 'Pause' : 'Play'}
-            @click=${() => store.set({ radarPlaying: !playing })}
+            @beforeinput=${stateDriven}
+            @click=${() => store.set({ radarPlaying: !store.get().radarPlaying })}
           >
             <m3e-icon name="play_arrow" filled></m3e-icon>
             <m3e-icon slot="selected" name="pause" filled></m3e-icon>
@@ -101,7 +102,7 @@ export class SvScrubber extends SvElement {
                 variant="tonal"
                 toggle
                 ?selected=${speed === sp}
-                @beforeinput=${(e: Event) => speed === sp && e.preventDefault()}
+                @beforeinput=${stateDriven}
                 @click=${() => store.set({ radarSpeed: sp })}
               >${sp}×</m3e-button>`,
             )}
@@ -111,16 +112,19 @@ export class SvScrubber extends SvElement {
             @click=${() => store.set({ radarSpeed: SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length] })}>${speed}×</m3e-button>
 
           <div class="sv-scrubber-time">
-            <div class="sv-scrubber-clock">
-              ${time ? format(time, 'h:mm a') : '—'}
+            <div class="sv-scrubber-clock">${time ? format(time, 'h:mm a') : '—'}</div>
+            <div class="sv-scrubber-date sv-label-medium ${shown?.type === 'nowcast' ? 'forecast' : ''}">
+              <span class="sv-muted sv-date-text">${time ? html`<span class="sv-weekday">${format(time, 'EEE')}, </span>${format(time, 'MMM d')}` : ''}</span>
               ${shown?.type === 'nowcast' ? html`<span class="sv-chip sv-chip--tertiary">Forecast</span>` : nothing}
             </div>
-            <div class="sv-label-medium sv-muted">${time ? format(time, 'EEE, MMM d') : ''}</div>
           </div>
 
-          <m3e-button variant="tonal" size="extra-small" @click=${jumpToNow}>
+          <m3e-button variant="tonal" size="extra-small" class="sv-now" @click=${jumpToNow}>
             <m3e-icon slot="icon" name="skip_next"></m3e-icon>Now
           </m3e-button>
+          <m3e-icon-button variant="tonal" size="small" class="sv-now-compact" aria-label="Jump to now" @click=${jumpToNow}>
+            <m3e-icon name="skip_next"></m3e-icon>
+          </m3e-icon-button>
           <m3e-icon-button variant="standard" size="small" class="sv-radar-refresh" aria-label="Refresh radar" ?disabled=${loading} @click=${refreshRadar}>
             <m3e-icon name="refresh"></m3e-icon>
           </m3e-icon-button>

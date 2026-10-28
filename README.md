@@ -47,9 +47,13 @@ The server renderer is used when storm arrows are on (the server draws them), wh
 
 ## Icon font
 
-Icons use **Material Symbols Rounded**, cut down to only the icons SkyView uses: about 190 KB instead of the full 5.3 MB. The font is `src/assets/fonts/material-symbols-rounded.woff2`, and the list of included icons sits next to it. `src/lib/icons.ts` makes every `<m3e-icon>` use Rounded. The component otherwise defaults to "Outlined", which only works on machines that have that font installed.
+Icons are **Material Symbols Rounded**, drawn as **SVG** rather than font text. Font glyphs are positioned by each platform's text engine, and iOS drew every icon slightly up and to the left. An SVG fills its box exactly everywhere.
 
-`scripts/build-icon-font.py` rebuilds the font whenever a new icon name appears in `src/`. It runs before `npm run dev` / `npm run build`, and the dev server re-runs it when you save a file. Use `npm run build:icons` to force a rebuild. It needs fontTools and the `woff2` tools (`pacman -S python-fonttools woff2`); without them the committed font is kept.
+`scripts/build-icon-font.py` scans `src/` for icon names. It extracts each icon's outlined and filled shapes from the font into `src/assets/icons/material-symbols-rounded.json`, which `src/lib/icons.ts` registers with `<m3e-icon>`. It also writes a cut-down font, `src/assets/fonts/material-symbols-rounded.woff2` (about 190 KB instead of 5.3 MB), as a fallback for any icon that isn't registered.
+
+`src/lib/icons.ts` also makes `<m3e-icon>` default to Rounded. The component otherwise defaults to "Outlined", which only works on machines that have that font installed.
+
+The script rebuilds both files whenever a new icon name appears in `src/`. It runs before `npm run dev` / `npm run build`, and the dev server re-runs it when you save a file. Use `npm run build:icons` to force a rebuild. It needs fontTools and the `woff2` tools (`pacman -S python-fonttools woff2`); without them the committed font is kept.
 
 ## Keyboard
 

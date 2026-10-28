@@ -2,7 +2,7 @@ import { html, nothing } from 'lit';
 import { customElement } from 'lit/decorators.js';
 import { AQI_SCALE, harmonize } from '../lib/format';
 import { store, StoreController } from '../lib/store';
-import { SvElement } from '../lib/ui';
+import { stateDriven, SvElement } from '../lib/ui';
 import './sv-map';
 import './sv-scrubber';
 import './sv-sidebar';
@@ -68,15 +68,15 @@ export class SvApp extends SvElement {
         : html`<m3e-button variant="text" size="extra-small" class="sv-beta-btn" @click=${() => store.set({ betaOpen: true })}>BETA</m3e-button>`}
       <m3e-button-group variant="connected" size="small">
         <m3e-icon-button toggle ?selected=${layer === 'radar'} variant="tonal" aria-label="Radar layer"
-          @beforeinput=${(e: Event) => layer === 'radar' && e.preventDefault()} @click=${() => store.set({ mapLayer: 'radar' })}>
+          @beforeinput=${stateDriven} @click=${() => store.set({ mapLayer: 'radar' })}>
           <m3e-icon name="radar"></m3e-icon><m3e-icon slot="selected" name="radar" filled></m3e-icon>
         </m3e-icon-button>
         <m3e-icon-button toggle ?selected=${layer === 'aqi'} variant="tonal" aria-label="Air quality layer"
-          @beforeinput=${(e: Event) => layer === 'aqi' && e.preventDefault()} @click=${() => store.set({ mapLayer: 'aqi' })}>
+          @beforeinput=${stateDriven} @click=${() => store.set({ mapLayer: 'aqi' })}>
           <m3e-icon name="air"></m3e-icon><m3e-icon slot="selected" name="air" filled></m3e-icon>
         </m3e-icon-button>
       </m3e-button-group>
-      <m3e-icon-button toggle ?selected=${satellite} aria-label="Satellite imagery" @click=${() => store.set({ showSatellite: !satellite })}>
+      <m3e-icon-button toggle ?selected=${satellite} aria-label="Satellite imagery" @beforeinput=${stateDriven} @click=${() => store.set({ showSatellite: !store.get().showSatellite })}>
         <m3e-icon name="satellite_alt"></m3e-icon><m3e-icon slot="selected" name="satellite_alt" filled></m3e-icon>
       </m3e-icon-button>
       ${compact
@@ -86,7 +86,7 @@ export class SvApp extends SvElement {
           </m3e-icon-button>`}
       ${compact
         ? nothing
-        : html`<m3e-icon-button variant="filled" width="wide" toggle ?selected=${settingsOpen} aria-label="Settings" @click=${() => store.set({ settingsOpen: !settingsOpen })}>
+        : html`<m3e-icon-button variant="filled" width="wide" toggle ?selected=${settingsOpen} aria-label="Settings" @beforeinput=${stateDriven} @click=${() => store.set({ settingsOpen: !store.get().settingsOpen })}>
             <m3e-icon name="settings"></m3e-icon><m3e-icon slot="selected" name="settings" filled></m3e-icon>
           </m3e-icon-button>`}
     </m3e-toolbar>`;

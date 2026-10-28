@@ -128,7 +128,7 @@ export class SvHourly extends SvThemed {
 function hourDialog(sel: Hour | null, open: boolean, onClosed: () => void) {
   return html`<m3e-dialog class="sv-dialog" ?open=${open} dismissible @closed=${onClosed}>
     ${sel
-      ? html`<div slot="header" class="sv-dialog-head">
+      ? html`<div slot="header" class="sv-dialog-head sv-hour-head">
             <div class="sv-headline-small">${format(sel.time, 'h:mm a')}</div>
             <div class="sv-body-medium sv-muted">${format(sel.time, 'EEEE, MMM d')}</div>
           </div>

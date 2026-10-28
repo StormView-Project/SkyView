@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
-"""Builds src/assets/fonts/material-symbols-rounded.woff2: Material Symbols Rounded
-cut down to just the icons SkyView uses.
+"""Builds the icon assets: src/assets/icons/material-symbols-rounded.json (every icon
+SkyView uses as SVG paths, which is what renders) and
+src/assets/fonts/material-symbols-rounded.woff2 (Material Symbols Rounded cut down
+to the same icons, a fallback for any icon that isn't registered as SVG).
 
 The full variable font is ~5.4 MB with ~3,800 icons; phones often gave up on it
 and showed icon names as text. This keeps every axis (FILL, wght, GRAD, opsz) but
@@ -33,6 +35,7 @@ SOURCE = ROOT / 'node_modules/material-symbols/material-symbols-rounded.woff2'
 OUT_DIR = ROOT / 'src/assets/fonts'
 OUT = OUT_DIR / 'material-symbols-rounded.woff2'
 LIST = OUT_DIR / 'material-symbols-rounded.icons.txt'  # what's in the font + a hash stamp
+SVGS = ROOT / 'src/assets/icons/material-symbols-rounded.json'  # name -> [outlined, filled] SVG paths
 M3E = ROOT / 'node_modules/@m3e/web/dist'
 
 TOKEN = re.compile(r"""['"`]([a-z0-9_]{2,})['"`]|name=["']([a-z0-9_]{2,})["']""")
@@ -124,10 +127,51 @@ def build(keep):
         sub.subset(font)
         ttf = tmp / 'subset.ttf'
         font.save(str(ttf))
+        export_svgs(ttf, keep)
         subprocess.run([tool('woff2_compress'), str(ttf)], check=True, capture_output=True)
         OUT_DIR.mkdir(parents=True, exist_ok=True)
         shutil.move(str(tmp / 'subset.woff2'), OUT)
         return keep
+
+
+def export_svgs(ttf, keep):
+    """Every icon as SVG path data, outlined (FILL 0) and filled (FILL 1).
+
+    m3e-icon renders registered icons as SVG instead of font text, which sits
+    exactly in its 1em box on every platform (iOS drew the font glyphs offset).
+    Paths use Material's standard viewBox "0 -960 960 960": the font's 960-unit
+    em with y flipped.
+    """
+    import json
+    from fontTools.pens.svgPathPen import SVGPathPen
+    from fontTools.pens.transformPen import TransformPen
+    from fontTools.ttLib import TTFont
+    from fontTools.varLib import instancer
+
+    def num(v):
+        return f'{v:.1f}'.rstrip('0').rstrip('.')
+
+    paths = {name: ['', ''] for name in keep}
+    for i, fill in enumerate((0, 1)):
+        font = instancer.instantiateVariableFont(
+            TTFont(str(ttf)), {'FILL': fill, 'wght': 400, 'GRAD': 0, 'opsz': 24})
+        glyphs = font.getGlyphSet()
+        # Filled icons are separate glyphs ("home" -> "home.fill") that the font
+        # swaps in through a FILL-conditional single substitution (rclt).
+        swap = {}
+        if fill:
+            for lookup in font['GSUB'].table.LookupList.Lookup:
+                if lookup.LookupType == 1:
+                    for st in lookup.SubTable:
+                        swap.update(st.mapping)
+        for name, _first, lig in ligatures(font):
+            if name in paths:
+                pen = SVGPathPen(glyphs, ntos=num)
+                glyph = swap.get(lig.LigGlyph, lig.LigGlyph)
+                glyphs[glyph].draw(TransformPen(pen, (1, 0, 0, -1, 0, 0)))
+                paths[name][i] = pen.getCommands()
+    SVGS.parent.mkdir(parents=True, exist_ok=True)
+    SVGS.write_text(json.dumps({k: v for k, v in sorted(paths.items()) if v[0]}, separators=(',', ':')) + '\n')
 
 
 def stamp(keep):
@@ -151,7 +195,7 @@ def main():
     # The stamp covers every candidate string (not just real icons), so any new
     # string literal triggers a rebuild; the rebuild works out which are icons.
     want_stamp = stamp(candidates)
-    if OUT.exists() and old_stamp == want_stamp and not force:
+    if OUT.exists() and SVGS.exists() and old_stamp == want_stamp and not force:
         return 0
     if check:
         log('icon font is out of date — run: python3 scripts/build-icon-font.py')
@@ -169,7 +213,7 @@ def main():
         f'# stamp {want_stamp}\n' + '\n'.join(keep) + '\n'
     )
     log(f'built {OUT.relative_to(ROOT)}: {len(keep)} icons, {OUT.stat().st_size // 1024} KB '
-        f'(full font: {SOURCE.stat().st_size // 1024} KB)')
+        f'(full font: {SOURCE.stat().st_size // 1024} KB) + SVGs ({SVGS.stat().st_size // 1024} KB)')
     return 0
 
 

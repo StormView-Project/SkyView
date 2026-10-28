@@ -1,10 +1,60 @@
-import { html, nothing } from 'lit';
+import { html, nothing, type TemplateResult } from 'lit';
 import { customElement, query, state } from 'lit/decorators.js';
 import { errorText } from '../lib/api';
 import { loadWebLLM, sendChat, WEBLLM_MODELS, webgpuAvailable } from '../lib/assistant';
 import { $, store, StoreController } from '../lib/store';
 import type { ChatMessage } from '../lib/types';
 import { SvElement } from '../lib/ui';
+
+/** **bold** and *italic* inside one line of a reply. */
+function inline(text: string): (string | TemplateResult)[] {
+  return text.split(/(\*\*[^*]+\*\*|\*[^*\s][^*]*\*)/g).filter(Boolean).map((part) =>
+    part.startsWith('**') && part.endsWith('**') && part.length > 4 ? html`<strong>${part.slice(2, -2)}</strong>`
+      : part.startsWith('*') && part.endsWith('*') && part.length > 2 ? html`<em>${part.slice(1, -1)}</em>`
+        : part);
+}
+
+/**
+ * The light Markdown small models like to answer in: paragraphs, "- " / "1. "
+ * lists and **bold**. Built from Lit templates (never innerHTML), so model
+ * output can't inject markup.
+ */
+function formatReply(text: string): TemplateResult[] {
+  const blocks: TemplateResult[] = [];
+  let list: { ordered: boolean; items: string[] } | null = null;
+  let para: string[] = [];
+  const flushPara = () => {
+    if (para.length) blocks.push(html`<p>${para.map((l, i) => html`${i ? html`<br />` : ''}${inline(l)}`)}</p>`);
+    para = [];
+  };
+  const flushList = () => {
+    if (!list) return;
+    const items = list.items.map((it) => html`<li>${inline(it)}</li>`);
+    blocks.push(list.ordered ? html`<ol>${items}</ol>` : html`<ul>${items}</ul>`);
+    list = null;
+  };
+  for (const raw of text.trim().split('\n')) {
+    const line = raw.trim();
+    const bullet = /^[-*•]\s+(.*)$/.exec(line);
+    const numbered = /^\d+[.)]\s+(.*)$/.exec(line);
+    if (bullet || numbered) {
+      flushPara();
+      const ordered = !!numbered;
+      if (list && list.ordered !== ordered) flushList();
+      list ??= { ordered, items: [] };
+      list.items.push((bullet ?? numbered)![1]);
+    } else if (!line) {
+      flushPara();
+      flushList();
+    } else {
+      flushList();
+      para.push(line.replace(/^#+\s*/, ''));
+    }
+  }
+  flushPara();
+  flushList();
+  return blocks;
+}
 
 const SUGGESTIONS = ['Will it rain today?', 'What should I wear?', 'Any alerts right now?', 'Warmest day this week?'];
 
@@ -93,7 +143,7 @@ export class SvAssistant extends SvElement {
   }
 
   render() {
-    const [open, provider, model, side] = this.s.value;
+    const [open, provider, model, side, narrow] = this.s.value;
     const gate = this.gate();
     return html`
       <div class="sv-assistant" data-side=${side === 'left' ? 'right' : 'left'}>
@@ -113,9 +163,9 @@ export class SvAssistant extends SvElement {
               ${gate ??
               html`<div class="sv-chat-log sv-scroll">
                   ${this.messages.length
-                    ? this.messages.map((m, i) => html`<div class="sv-msg sv-msg--${m.role}">
-                        ${m.content || (this.streaming && i === this.messages.length - 1 ? html`<m3e-loading-indicator class="sv-small-loader"></m3e-loading-indicator>` : '')}
-                      </div>`)
+                    ? this.messages.map((m, i) => html`<div class="sv-msg sv-msg--${m.role}">${m.content
+                        ? m.role === 'assistant' ? formatReply(m.content) : m.content.trim()
+                        : this.streaming && i === this.messages.length - 1 ? html`<m3e-loading-indicator class="sv-small-loader"></m3e-loading-indicator>` : ''}</div>`)
                     : html`<div class="sv-chat-empty">
                         <div class="sv-body-medium sv-muted">Ask me anything about your weather.</div>
                         <m3e-chip-set>${SUGGESTIONS.map((q) => html`<m3e-suggestion-chip @click=${() => this.send(q)}>${q}</m3e-suggestion-chip>`)}</m3e-chip-set>
@@ -132,7 +182,7 @@ export class SvAssistant extends SvElement {
                 </form>`}
             </section>`
           : nothing}
-        <m3e-fab variant=${open ? 'secondary-container' : 'tertiary-container'} size="medium" aria-label="Weather assistant" @click=${() => store.set({ assistantOpen: !open })}>
+        <m3e-fab variant=${open ? 'secondary-container' : 'tertiary-container'} size=${narrow ? 'small' : 'medium'} aria-label="Weather assistant" @click=${() => store.set({ assistantOpen: !open })}>
           <m3e-icon name=${open ? 'close' : 'smart_toy'} filled></m3e-icon>
         </m3e-fab>
       </div>
