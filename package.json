@@ -7,10 +7,11 @@
     "dev": "vite --host",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "predev": "node scripts/build-radar-wasm.mjs",
-    "prebuild": "node scripts/build-radar-wasm.mjs",
+    "predev": "node scripts/build-radar-wasm.mjs && python3 scripts/build-icon-font.py",
+    "prebuild": "node scripts/build-radar-wasm.mjs && python3 scripts/build-icon-font.py",
     "build:wasm": "node scripts/build-radar-wasm.mjs --force",
-    "gen:radar-colors": "node scripts/gen-radar-colors.mjs"
+    "gen:radar-colors": "node scripts/gen-radar-colors.mjs",
+    "build:icons": "python3 scripts/build-icon-font.py --force"
   },
   "dependencies": {
     "@fontsource-variable/google-sans-flex": "^5.3.2",

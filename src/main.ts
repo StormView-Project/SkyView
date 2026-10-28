@@ -1,7 +1,6 @@
 // Typefaces: Google Sans Flex (the M3 Expressive brand face, variable weight/width/roundness)
-// and Material Symbols Rounded (variable FILL/weight icon font used by <m3e-icon>).
+// and Material Symbols Rounded (variable FILL/weight icon font used by <m3e-icon>, see lib/icons.ts).
 import '@fontsource-variable/google-sans-flex/full.css';
-import 'material-symbols/rounded.css';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 // Material 3 Expressive components.
@@ -9,6 +8,7 @@ import '@m3e/web/theme';
 import '@m3e/web/button';
 import '@m3e/web/button-group';
 import '@m3e/web/icon';
+import './lib/icons'; // before any component renders an icon
 import '@m3e/web/icon-button';
 import '@m3e/web/toolbar';
 import '@m3e/web/card';

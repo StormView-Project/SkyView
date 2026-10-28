@@ -45,6 +45,12 @@ The server renderer is used when storm arrows are on (the server draws them), wh
 
 **Rebuilding `radar.wasm`**: `scripts/build-radar-wasm.mjs` compiles `radar.c` with clang (wasm32 + SIMD) and swaps the result into place. It rebuilds only when the source's hash differs from `radar.wasm.sha256`. It runs before `npm run dev` / `npm run build`, and the dev server re-runs it (and reloads the page) whenever you save `radar.c`. Use `npm run build:wasm` to force a rebuild. It needs `clang` and `lld`; without them, the committed `radar.wasm` is used. `npm run gen:radar-colors` regenerates `colorTables.ts` from LibreWXR's color table.
 
+## Icon font
+
+Icons use **Material Symbols Rounded**, cut down to only the icons SkyView uses: about 190 KB instead of the full 5.3 MB. The font is `src/assets/fonts/material-symbols-rounded.woff2`, and the list of included icons sits next to it. `src/lib/icons.ts` makes every `<m3e-icon>` use Rounded. The component otherwise defaults to "Outlined", which only works on machines that have that font installed.
+
+`scripts/build-icon-font.py` rebuilds the font whenever a new icon name appears in `src/`. It runs before `npm run dev` / `npm run build`, and the dev server re-runs it when you save a file. Use `npm run build:icons` to force a rebuild. It needs fontTools and the `woff2` tools (`pacman -S python-fonttools woff2`); without them the committed font is kept.
+
 ## Keyboard
 
 `Ctrl+,` or `F2` opens settings. `F3` / `Ctrl+Tab` moves to the next settings tab. `Space` plays or pauses the radar. `←` / `→` step through radar frames. `+` / `-` zoom. `Esc` closes panels. Right-click or long-press the map for the context menu.

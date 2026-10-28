@@ -1,0 +1,9 @@
+/* Material Symbols Rounded, subset to the icons SkyView uses (scripts/build-icon-font.py).
+   `block` keeps icon names invisible while the font loads instead of flashing as text. */
+@font-face {
+  font-family: 'Material Symbols Rounded';
+  font-style: normal;
+  font-weight: 100 700;
+  font-display: block;
+  src: url('../assets/fonts/material-symbols-rounded.woff2') format('woff2');
+}
