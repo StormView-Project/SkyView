@@ -622,7 +622,8 @@ m3e-card.sv-preview-card { --m3e-card-padding: 0; --m3e-card-shape: 28px; overfl
 .sv-app[data-compact='true'] .sv-sheet-body { padding: 12px 12px 24px; }
 .sv-app[data-compact='true'] .sv-sheet-foot { display: none; }
 .sv-app[data-compact='true'] .sv-assistant { right: 16px; left: auto; align-items: flex-end; bottom: calc(var(--sv-nav-h) + 16px); }
-.sv-app[data-compact='true'][data-tab='radar'] .sv-assistant { bottom: calc(var(--sv-nav-h) + 200px); }
+/* Just above the scrubber/legend (measured in sv-app), which is shorter on narrow screens. */
+.sv-app[data-compact='true'][data-tab='radar'] .sv-assistant { bottom: calc(var(--sv-nav-h) + var(--sv-radar-dock-h, 172px) + 28px); }
 .sv-app[data-compact='true'] .sv-chat { height: min(520px, calc(100dvh - var(--sv-nav-h) - 120px)); }
 .sv-app[data-compact='true'] .maplibregl-ctrl-top-right, .sv-app[data-compact='true'] .maplibregl-ctrl-top-left { top: calc(84px + var(--sv-safe-top)) !important; }
 
@@ -689,6 +690,10 @@ m3e-card.sv-detail, m3e-card.sv-preview-card { transition: border-radius 300ms v
   .sv-hero-number { font-size: 84px; }
   .sv-hero-condition { font-size: 22px; line-height: 28px; margin-top: 4px; }
   .sv-hero-chips { margin-top: 10px; gap: 6px; }
+  /* Chips pinned to the bottom of the scene and pushed into its bottom padding
+     (the extra margin above matches, so the hero stays the same height). */
+  .sv-hero--scene { display: flex; flex-direction: column; padding-bottom: 8px; }
+  .sv-hero--scene .sv-hero-chips { margin-top: auto; padding-top: 18px; }
   /* Two columns of detail cards instead of one tall single-column list. */
   .sv-details-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .sv-detail-inner { padding: 10px; }

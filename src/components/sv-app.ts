@@ -20,6 +20,17 @@ export class SvApp extends SvElement {
   private s = new StoreController(this, (s) =>
     [s.ready, s.isNarrow, s.compactLayout, s.compactTab, s.mapLayer, s.settingsOpen, s.sidebarPosition, s.showSatellite,
       s.tokens] as const);
+  /** Tracks the radar tab's bottom dock (scrubber or AQI legend) so the assistant button sits just above it. */
+  private dock?: Element;
+  private dockRo = new ResizeObserver(([e]) => this.style.setProperty('--sv-radar-dock-h', `${e.borderBoxSize[0].blockSize}px`));
+
+  updated() {
+    const dock = this.querySelector('.sv-compact-radar > :last-child') ?? undefined;
+    if (dock === this.dock) return;
+    if (this.dock) this.dockRo.unobserve(this.dock);
+    this.dock = dock;
+    if (dock) this.dockRo.observe(dock);
+  }
 
   connectedCallback() {
     super.connectedCallback();
