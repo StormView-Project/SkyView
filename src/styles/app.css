@@ -98,6 +98,17 @@ m3e-shape > .sv-swatch-split { position: absolute; inset: 0; margin: auto; }
 
 /* ------------------------------------------------------------- app shell */
 sv-app, .sv-app { position: fixed; inset: 0; display: block; }
+/* Installed to the iOS home screen (with the translucent status bar), WebKit sizes
+   the viewport as screen height minus the status bar, so anything pinned to the
+   bottom stops short and leaves a big empty band. There's no browser UI in that
+   mode, so the large viewport height is exactly the screen. */
+@media (display-mode: standalone) {
+  html, body { height: 100vh; height: 100lvh; }
+  sv-app, .sv-app { bottom: auto; height: 100vh; height: 100lvh; }
+}
+/* Same fix for iOS versions without the display-mode query (flag set in main.ts). */
+:root.ios-standalone, :root.ios-standalone body { height: 100vh; height: 100lvh; }
+:root.ios-standalone sv-app, :root.ios-standalone .sv-app { bottom: auto; height: 100vh; height: 100lvh; }
 sv-map { position: absolute; inset: 0; display: block; }
 .sv-map-canvas { position: absolute; inset: 0; }
 .sv-ctx-anchor { position: absolute; width: 1px; height: 1px; pointer-events: none; }
@@ -270,23 +281,28 @@ m3e-card.sv-widget {
 
 /* Daily accordion */
 .sv-days { display: flex; flex-direction: column; gap: 4px; }
-m3e-expansion-panel.sv-day-panel {
-  --m3e-expansion-panel-container-color: var(--md-sys-color-surface-container-low);
-  --m3e-expansion-panel-shape: 16px; --m3e-expansion-panel-open-shape: 24px;
-  --m3e-expansion-header-collapsed-height: 52px; --m3e-expansion-header-expanded-height: 52px;
-  /* Open in place: no M3 'separate on expand' gap, so the row doesn't jump. */
-  --_expansion-panel-open-spacing: 0px;
-  --m3e-expansion-header-padding-left: 12px; --m3e-expansion-header-padding-right: 8px;
-  --m3e-expansion-panel-content-padding: 0 12px 12px;
+/* Collapsible rows (7-day forecast, alerts): a header button + <sv-collapse>. */
+.sv-collapsible { overflow: hidden; transition: border-radius 300ms var(--sv-spring); }
+.sv-chevron { --m3e-icon-size: 20px; color: var(--md-sys-color-on-surface-variant); transition: transform 300ms var(--sv-spring); }
+.sv-collapsible.open > button .sv-chevron { transform: rotate(180deg); }
+.sv-collapsible > button {
+  width: 100%; border: none; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
-.sv-day-row { display: grid; grid-template-columns: 52px 28px 36px 34px 1fr 34px; align-items: center; gap: 6px; width: 100%; }
+.sv-collapsible > button:hover { background: color-mix(in srgb, currentColor 6%, transparent); }
+.sv-collapsible > button:focus-visible { outline: 3px solid var(--md-sys-color-secondary); outline-offset: -3px; border-radius: inherit; }
+
+.sv-day { background: var(--md-sys-color-surface-container-low); border-radius: 16px; }
+.sv-day.open { border-radius: 24px; }
+:root:not([data-press='ripple']) .sv-day:has(> .sv-day-row:active) { border-radius: 24px; }
+.sv-day-row { display: grid; grid-template-columns: 52px 28px 36px 34px 1fr 34px 20px; align-items: center; gap: 6px; height: 52px; padding: 0 8px 0 12px; border-radius: inherit; }
 .sv-day-lo, .sv-day-hi { text-align: right; }
 .sv-range { position: relative; height: 8px; border-radius: 4px; background: var(--md-sys-color-surface-container-highest); }
 .sv-range-fill {
   position: absolute; top: 0; bottom: 0; border-radius: 4px;
   background: linear-gradient(90deg, var(--md-sys-color-primary), var(--md-sys-color-tertiary));
 }
-.sv-day-detail { display: flex; flex-direction: column; gap: 10px; }
+.sv-day-detail { display: flex; flex-direction: column; gap: 10px; padding: 0 12px 12px; }
 .sv-mini-hours { gap: 4px; padding-bottom: 4px; }
 .sv-mini-hour {
   flex: 0 0 48px; display: grid; justify-items: center; gap: 4px; padding: 8px 2px; border: none; border-radius: 24px;
@@ -313,10 +329,12 @@ m3e-card.sv-detail { --m3e-card-padding: 0; --m3e-card-shape: 18px; --m3e-filled
 
 /* Alerts widget */
 .sv-alert-list { display: flex; flex-direction: column; gap: 6px; }
-m3e-expansion-panel.sv-alert-panel { --_expansion-panel-open-spacing: 0px; --m3e-expansion-panel-shape: 18px; --m3e-expansion-panel-open-shape: 24px; --m3e-expansion-panel-content-padding: 0 14px 14px; }
-.sv-alert-header { display: flex; align-items: center; gap: 8px; width: 100%; }
+.sv-alert-item { border-radius: 18px; }
+.sv-alert-item.open { border-radius: 24px; }
+.sv-alert-item .sv-chevron { color: inherit; }
+.sv-alert-header { display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 8px 12px 8px 14px; border-radius: inherit; }
 .sv-alert-title { flex: 1; font-weight: 600; font-size: 14px; }
-.sv-alert-body { display: flex; flex-direction: column; gap: 8px; font-size: 13px; line-height: 19px; max-height: 320px; overflow: auto; }
+.sv-alert-body { display: flex; flex-direction: column; gap: 8px; padding: 0 14px 14px; font-size: 13px; line-height: 19px; max-height: 320px; overflow: auto; }
 .sv-alert-instruction { font-weight: 600; }
 
 /* Wind */
@@ -465,6 +483,9 @@ m3e-expansion-panel.sv-alert-panel { --_expansion-panel-open-spacing: 0px; --m3e
 .sv-bullets { margin: 4px 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
 
 /* --------------------------------------------------------------- dialogs */
+/* m3e-dialog paints its surface as a positioned ::before; plain (non-positioned) text in
+   the actions row would be painted underneath it, so lift the row above the surface. */
+m3e-dialog > [slot='actions'] { position: relative; }
 m3e-dialog.sv-dialog { --m3e-dialog-shape: 28px; --m3e-dialog-max-width: min(560px, 92vw); --m3e-dialog-max-height: 86vh; }
 m3e-dialog.sv-dialog--wide { --m3e-dialog-max-width: min(680px, 94vw); }
 .sv-dialog-head { display: flex; align-items: center; gap: 10px; --m3e-icon-size: 26px; }
@@ -599,7 +620,7 @@ m3e-card.sv-preview-card { --m3e-card-padding: 0; --m3e-card-shape: 28px; overfl
   .sv-scrubber-clock { font-size: 18px; }
   .sv-scrubber-legend { display: none; }
   .sv-hero-number { font-size: 92px; }
-  .sv-day-row { grid-template-columns: 44px 26px 32px 30px 1fr 30px; gap: 4px; }
+  .sv-day-row { grid-template-columns: 44px 26px 32px 30px 1fr 30px 20px; gap: 4px; }
 }
 
 /* -------------------------------------------------------- press feedback */

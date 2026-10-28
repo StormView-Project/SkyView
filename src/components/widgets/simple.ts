@@ -6,6 +6,7 @@ import {
 import { $ } from '../../lib/store';
 import type { Alert, WeatherData } from '../../lib/types';
 import { meter, widget } from './common';
+import { toggleCollapse } from '../sv-collapse';
 
 /* ----------------------------------------------------------- alerts */
 
@@ -15,26 +16,26 @@ export function alertsWidget(alerts: Alert[]) {
     'alerts',
     `Active Alerts (${alerts.length})`,
     'warning',
-    html`<m3e-accordion class="sv-alert-list">
+    html`<div class="sv-alert-list">
       ${alerts.map((a) => {
         const c = semantic(SEVERITY_HUE[a.severity] ?? SEVERITY_HUE.Unknown);
-        return html`<m3e-expansion-panel
-          class="sv-alert-panel"
-          style="--m3e-expansion-panel-container-color:${c.container};--m3e-expansion-panel-text-color:${c.onContainer}"
-        >
-          <div slot="header" class="sv-alert-header">
+        return html`<div class="sv-alert-item sv-collapsible" style="background:${c.container};color:${c.onContainer}">
+          <button class="sv-alert-header sv-press" aria-expanded="false" @click=${toggleCollapse}>
             <m3e-icon name="warning" filled style="color:${c.color}"></m3e-icon>
             <span class="sv-alert-title">${a.title}</span>
             <span class="sv-chip" style="background:${c.color};color:${c.container}">${a.severity === 'Unknown' ? 'Alert' : a.severity}</span>
-          </div>
-          <div class="sv-alert-body">
-            ${a.end ? html`<div class="sv-label-medium">Until ${format(a.end, 'EEE h:mm a')}</div>` : nothing}
-            ${a.description ? html`<p class="sv-pre">${a.description}</p>` : nothing}
-            ${a.instruction ? html`<p class="sv-pre sv-alert-instruction">${a.instruction}</p>` : nothing}
-          </div>
-        </m3e-expansion-panel>`;
+            <m3e-icon class="sv-chevron" name="keyboard_arrow_down"></m3e-icon>
+          </button>
+          <sv-collapse>
+            <div class="sv-alert-body">
+              ${a.end ? html`<div class="sv-label-medium">Until ${format(a.end, 'EEE h:mm a')}</div>` : nothing}
+              ${a.description ? html`<p class="sv-pre">${a.description}</p>` : nothing}
+              ${a.instruction ? html`<p class="sv-pre sv-alert-instruction">${a.instruction}</p>` : nothing}
+            </div>
+          </sv-collapse>
+        </div>`;
       })}
-    </m3e-accordion>`,
+    </div>`,
   );
 }
 

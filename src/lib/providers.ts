@@ -24,10 +24,10 @@ type Json = any;
 /* ------------------------------------------------------------------ http */
 
 /** GET a URL and decode the JSON body, turning non-2xx responses into a readable error. */
-async function getJson<T = Json>(url: string, accept?: string, signal?: AbortSignal): Promise<T> {
+async function getJson<T = Json>(url: string, accept?: string, timeoutMs = 30_000): Promise<T> {
   const res = await fetch(url, {
     headers: accept ? { Accept: accept } : undefined,
-    signal: signal ?? AbortSignal.timeout(30_000),
+    signal: AbortSignal.timeout(timeoutMs),
   });
   if (!res.ok) {
     const body = await res.text().catch(() => '');
@@ -412,7 +412,7 @@ export async function searchLocation(query: string): Promise<Place[]> {
 }
 
 export async function reverseGeocode(lat: number, lon: number): Promise<Place> {
-  const r = await getJson(`${NOMINATIM}/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1&accept-language=en-US,en`);
+  const r = await getJson(`${NOMINATIM}/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1&accept-language=en-US,en`, undefined, 6_000);
   if (r.error) throw new Error('No place found at these coordinates');
   const p = placeFromNominatim(r, lat, lon);
   delete p.display;
@@ -423,13 +423,13 @@ export async function reverseGeocode(lat: number, lon: number): Promise<Place> {
 export async function ipLocate(): Promise<Place> {
   let place: Place | null = null;
   try {
-    const v = await getJson('https://ipwho.is/');
+    const v = await getJson('https://ipwho.is/', undefined, 5_000);
     if (v.success && num(v.latitude) != null && num(v.longitude) != null) {
       place = { lat: v.latitude, lon: v.longitude, name: v.city || 'My Location', state: v.region || '', country: v.country_code || '' };
     }
   } catch { /* try the next service */ }
   if (!place) {
-    const v = await getJson('https://ipapi.co/json/');
+    const v = await getJson('https://ipapi.co/json/', undefined, 5_000);
     if (num(v.latitude) == null || num(v.longitude) == null) throw new Error("Couldn't determine your location from your network.");
     place = { lat: v.latitude, lon: v.longitude, name: v.city || 'My Location', state: v.region || '', country: v.country_code || '' };
   }

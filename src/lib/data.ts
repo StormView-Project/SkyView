@@ -126,11 +126,22 @@ export function setLocation(place: Place) {
   store.set({ location: place, weather: null, alerts: [] });
 }
 
-/** "Use my location": the browser's Geolocation API first, then an IP lookup. */
-export async function locateMe(): Promise<Place> {
-  const fromBrowser = await new Promise<{ lat: number; lon: number } | null>((resolve) => {
-    if (!('geolocation' in navigator)) return resolve(null);
-    const timer = setTimeout(() => resolve(null), 20000);
+/** How long to wait for a position once the browser has permission. */
+const GEO_FIX_MS = 5_000;
+/** How long to wait for someone to answer the browser's location prompt. */
+const GEO_PROMPT_MS = 30_000;
+
+/** The browser's position, or null if it's blocked, unavailable or too slow. */
+async function browserPosition(): Promise<{ lat: number; lon: number } | null> {
+  if (!('geolocation' in navigator)) return null;
+  let state: PermissionState | 'unknown' = 'unknown';
+  try {
+    state = (await navigator.permissions.query({ name: 'geolocation' })).state;
+  } catch { /* Permissions API unsupported (older Safari) */ }
+  if (state === 'denied') return null;
+  return new Promise((resolve) => {
+    // Only a pending prompt gets the long wait — the person is deciding.
+    const timer = setTimeout(() => resolve(null), state === 'granted' ? GEO_FIX_MS + 500 : GEO_PROMPT_MS);
     navigator.geolocation.getCurrentPosition(
       (p) => {
         clearTimeout(timer);
@@ -140,17 +151,30 @@ export async function locateMe(): Promise<Place> {
         clearTimeout(timer);
         resolve(null);
       },
-      { timeout: 15000, maximumAge: 60000 },
+      // City-level accuracy is plenty for weather, and a recent cached fix is instant.
+      { enableHighAccuracy: false, timeout: GEO_FIX_MS, maximumAge: 30 * 60_000 },
     );
   });
-  if (fromBrowser) {
-    try {
-      return await api.reverseGeocode(fromBrowser.lat, fromBrowser.lon);
-    } catch {
-      return { ...fromBrowser, name: 'My Location', state: '', country: '' };
-    }
+}
+
+/**
+ * "Use my location": the browser's position, named via reverse geocoding. The
+ * IP lookup starts at the same time, so if the browser's position is blocked or
+ * slow, the fallback is already (nearly) done instead of starting from scratch.
+ */
+export async function locateMe(): Promise<Place> {
+  const fromIp = api.ipLocate();
+  fromIp.catch(() => {}); // only awaited if the browser can't help
+  const pos = await browserPosition();
+  if (!pos) return fromIp;
+  try {
+    return await api.reverseGeocode(pos.lat, pos.lon);
+  } catch {
+    // Nominatim slow or down: use the IP lookup's place name if it's the same area.
+    const ip = await Promise.race([fromIp, new Promise<null>((r) => setTimeout(() => r(null), 1500))]).catch(() => null);
+    const near = ip && Math.abs(ip.lat - pos.lat) < 0.5 && Math.abs(ip.lon - pos.lon) < 0.5;
+    return near ? { ...ip, ...pos } : { ...pos, name: 'My Location', state: '', country: '' };
   }
-  return api.ipLocate();
 }
 
 /** Starts every poller and reacts to the settings that invalidate data. */

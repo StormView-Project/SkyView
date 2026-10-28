@@ -24,7 +24,6 @@ import '@m3e/web/form-field';
 import '@m3e/web/list';
 import '@m3e/web/chips';
 import '@m3e/web/callout';
-import '@m3e/web/expansion-panel';
 import '@m3e/web/loading-indicator';
 import '@m3e/web/progress-indicator';
 import '@m3e/web/menu';
@@ -45,6 +44,9 @@ import { store } from './lib/store';
 import { initTheme } from './lib/theme';
 import { initPressFx, openExternal, toast } from './lib/ui';
 import './components/sv-app';
+
+// Launched from the iOS home screen (Safari's non-standard flag); see the standalone CSS.
+if ((navigator as Navigator & { standalone?: boolean }).standalone) document.documentElement.classList.add('ios-standalone');
 
 // The map has its own context menu; don't stack the browser's on top of it.
 document.addEventListener('contextmenu', (e) => {

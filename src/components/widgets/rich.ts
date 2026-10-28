@@ -9,6 +9,7 @@ import {
 import { $, DETAILS_FIELD_LABELS, StoreController } from '../../lib/store';
 import type { Day, Hour, OutlookDay, WeatherData } from '../../lib/types';
 import { SvElement, wheelToHorizontal } from '../../lib/ui';
+import { toggleCollapse } from '../sv-collapse';
 import '../sv-scene';
 import { widget, wxIcon, wxShape } from './common';
 
@@ -209,23 +210,24 @@ export class SvDaily extends SvThemed {
     const hi = Math.max(...daily.map((d) => d.tempMax ?? -Infinity));
     const range = hi - lo || 1;
     return widget('daily', `${daily.length}-Day Forecast`, 'calendar_month', html`
-      <m3e-accordion class="sv-days">
+      <div class="sv-days">
         ${daily.map((d, i) => {
           const left = (((d.tempMin ?? lo) - lo) / range) * 100;
           const width = Math.max(4, (((d.tempMax ?? hi) - (d.tempMin ?? lo)) / range) * 100);
-          return html`<m3e-expansion-panel class="sv-day-panel">
-            <div slot="header" class="sv-day-row">
+          return html`<div class="sv-day sv-collapsible">
+            <button class="sv-day-row sv-press" aria-expanded="false" @click=${toggleCollapse}>
               <span class="sv-title-small sv-day-name">${i === 0 ? 'Today' : format(d.date, 'EEE')}</span>
               ${wxIcon(d.conditionCode, true, 24)}
               <span class="sv-label-medium sv-rain sv-day-pop">${(d.precipProb ?? 0) > 10 ? `${d.precipProb}%` : ''}</span>
               <span class="sv-title-small sv-muted sv-day-lo">${d.tempMin ?? '—'}°</span>
               <span class="sv-range"><span class="sv-range-fill" style="left:${left}%;width:${width}%"></span></span>
               <span class="sv-title-small sv-day-hi">${d.tempMax ?? '—'}°</span>
-            </div>
-            ${dayDetail(d, this.data.hourly, this.pick)}
-          </m3e-expansion-panel>`;
+              <m3e-icon class="sv-chevron" name="keyboard_arrow_down"></m3e-icon>
+            </button>
+            <sv-collapse>${dayDetail(d, this.data.hourly, this.pick)}</sv-collapse>
+          </div>`;
         })}
-      </m3e-accordion>`);
+      </div>`);
   }
 }
 
