@@ -10,14 +10,14 @@ import { $, DETAILS_FIELD_LABELS, StoreController } from '../../lib/store';
 import type { Day, Hour, OutlookDay, WeatherData } from '../../lib/types';
 import { SvElement, wheelToHorizontal } from '../../lib/ui';
 import { toggleCollapse } from '../sv-collapse';
-import '../sv-scene';
+import { resolveSeason } from '../sv-scene';
 import { widget, wxIcon, wxShape } from './common';
 
 const has = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 
 /** Re-renders when theme tokens or units change — harmonized colors and labels depend on them. */
 class SvThemed extends SvElement {
-  protected themed = new StoreController(this, (s) => [s.tokens, s.units, s.location, s.weatherScene] as const);
+  protected themed = new StoreController(this, (s) => [s.tokens, s.units, s.location, s.weatherScene, s.sceneSeason] as const);
 }
 
 /* ======================================================= current conditions */
@@ -35,7 +35,8 @@ export class SvCurrent extends SvThemed {
     return html`
       <section class="sv-hero ${scene ? 'sv-hero--scene' : ''}">
         ${scene
-          ? html`<sv-scene .code=${cu.conditionCode} .day=${cu.isDay} .windMph=${windMph} .tokens=${s.tokens}></sv-scene>`
+          ? html`<sv-scene .code=${cu.conditionCode} .day=${cu.isDay} .windMph=${windMph} .tokens=${s.tokens}
+              .season=${resolveSeason(s.sceneSeason, s.location?.lat)}></sv-scene>`
           : nothing}
         <div class="sv-hero-main">
           <div class="sv-hero-temp">

@@ -3,6 +3,7 @@ import { customElement, query, state } from 'lit/decorators.js';
 import { format } from 'date-fns';
 import { jumpToNow, refreshRadar } from '../lib/data';
 import { store, StoreController } from '../lib/store';
+import { haptic } from '../lib/haptics';
 import { stateDriven, SvElement } from '../lib/ui';
 
 const SPEEDS = [0.5, 1, 2] as const;
@@ -38,7 +39,10 @@ export class SvScrubber extends SvElement {
   private onPointerMove = (e: PointerEvent) => {
     const idx = this.posToIdx(e.clientX);
     if (this.dragging) {
-      if (idx !== this.s.value[1]) store.set({ radarIdx: idx });
+      if (idx !== this.s.value[1]) {
+        store.set({ radarIdx: idx });
+        haptic('drag');
+      }
     } else {
       this.hoverIdx = idx;
     }

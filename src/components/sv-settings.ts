@@ -39,6 +39,15 @@ const COLOR_SCHEMES = [
 
 const set = (patch: Partial<Settings>) => store.set(patch);
 
+const SEASONS: { value: Settings['sceneSeason']; label: string; desc: string }[] = [
+  { value: 'auto', label: 'Automatic', desc: 'Follows the season where you are: blossoms in spring, fireflies on summer nights, falling leaves in autumn, frost and icicles in winter.' },
+  { value: 'spring', label: 'Spring', desc: 'Cherry blossom petals drift across the scene.' },
+  { value: 'summer', label: 'Summer', desc: 'Warm floating light by day, fireflies at night.' },
+  { value: 'fall', label: 'Fall', desc: 'Leaves tumble and drift across the scene.' },
+  { value: 'winter', label: 'Winter', desc: 'Glinting icicles and sparkling frost — not snowfall, so it never looks like it’s snowing.' },
+  { value: 'off', label: 'Off', desc: 'Just the weather.' },
+];
+
 /* ----------------------------------------------------------- primitives */
 
 function group(title: string, body: TemplateResult | (TemplateResult | typeof nothing)[], sub?: string) {
@@ -299,8 +308,24 @@ export class SvSettings extends SvElement {
       ${group('Layout', [
         s.isNarrow && s.compactLayout ? nothing : row('Sidebar position', segmented([{ label: 'Left', value: 'left' }, { label: 'Right', value: 'right' }], s.sidebarPosition, (v) => set({ sidebarPosition: v })), undefined, true),
         toggle('Phone layout', s.compactLayout, (v) => set({ compactLayout: v }), 'On phones and narrow windows, use a scrollable weather page with a navigation bar instead of the map + sidebar.'),
-        toggle('Animated weather scene', s.weatherScene, (v) => set({ weatherScene: v }), 'Show the current conditions as a gentle animation behind the temperature — sun, drifting clouds, rain, snow, fog and lightning.'),
       ])}
+
+      ${group('Weather scene', [
+        toggle('Animated weather scene', s.weatherScene, (v) => set({ weatherScene: v }), 'Show the current conditions as a gentle animation behind the temperature — sun, drifting clouds, rain, snow, fog and lightning.'),
+        s.weatherScene
+          ? html`<m3e-form-field variant="outlined" class="sv-field">
+              <label slot="label" for="season-select">Seasonal touches</label>
+              <m3e-select id="season-select" @change=${(e: Event) => set({ sceneSeason: valueOf(e) as Settings['sceneSeason'] })}>
+                ${SEASONS.map((o) => html`<m3e-option value=${o.value} ?selected=${o.value === s.sceneSeason}>${o.label}</m3e-option>`)}
+              </m3e-select>
+            </m3e-form-field>`
+          : nothing,
+        s.weatherScene
+          ? html`<p class="sv-body-small sv-muted">${SEASONS.find((o) => o.value === s.sceneSeason)?.desc ?? ''}</p>`
+          : nothing,
+      ])}
+
+      ${group('Touch', toggle('Haptic feedback', s.haptics, (v) => set({ haptics: v }), 'Feel a light tap when you press buttons, flip switches and drag. Works on Android and on iPhone with iOS 18 or later.'))}
     `;
   }
 
@@ -379,6 +404,7 @@ export class SvSettings extends SvElement {
             toggle('Smoothing', s.radarSmooth, (v) => set({ radarSmooth: v }), 'Server-side smoothing of radar echoes.'),
             toggle('Snow colors', s.radarSnow, (v) => set({ radarSnow: v }), 'Color frozen precipitation separately using the model snow mask.'),
             toggle('Satellite imagery', s.showSatellite, (v) => set({ showSatellite: v })),
+            toggle('Lightning strikes', s.showLightning, (v) => set({ showLightning: v }), 'Live strikes from the last 15 minutes, from the Blitzortung.org community network. Fresh strikes are white and fade to orange.'),
             toggle('Storm motion arrows', s.showArrows, (v) => set({ showArrows: v }), 'Optical-flow storm direction arrows; color follows light/dark mode.'),
           ])}`
         : nothing}
@@ -439,6 +465,7 @@ export class SvSettings extends SvElement {
         !s.location ? html`<p class="sv-body-small sv-muted">Set your location first so SkyView knows which alerts to send.</p>` : nothing,
         on ? toggle('NWS weather alerts', s.notifNws, (v) => set({ notifNws: v }), 'Tornado, severe thunderstorm, flood warnings & more') : nothing,
         on ? toggle('Air quality alerts', s.notifAqi, (v) => set({ notifAqi: v }), 'When AQI reaches Unhealthy (200+)') : nothing,
+        on ? toggle('Rain starting soon', s.notifRain, (v) => set({ notifRain: v }), 'A heads-up when rain or snow is about to start in the next 45 minutes') : nothing,
         html`<p class="sv-body-small sv-muted">Alerts are checked every 90 seconds while a SkyView tab is open. Install it to your home screen for an app-like experience.</p>`,
         on ? html`<m3e-button variant="tonal" @click=${() => api.testNotification()}><m3e-icon slot="icon" name="notifications"></m3e-icon>Send a test notification</m3e-button>` : nothing,
       ])}

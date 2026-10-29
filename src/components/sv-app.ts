@@ -10,6 +10,7 @@ import './sv-settings';
 import './sv-dialogs';
 import './sv-assistant';
 import './sv-radar-preview';
+import './sv-sheets';
 
 const NARROW = 760;
 const TABS = ['location', 'api', 'display', 'widgets', 'radar', 'alerts', 'assistant'] as const;
@@ -19,7 +20,7 @@ const typing = (e: KeyboardEvent) => !!(e.target as HTMLElement).closest?.('inpu
 export class SvApp extends SvElement {
   private s = new StoreController(this, (s) =>
     [s.ready, s.isNarrow, s.compactLayout, s.compactTab, s.mapLayer, s.settingsOpen, s.sidebarPosition, s.showSatellite,
-      s.tokens] as const);
+      s.tokens, s.showLightning, s.editingWidgets] as const);
   /** Tracks the radar tab's bottom dock (scrubber or AQI legend) so the assistant button sits just above it. */
   private dock?: Element;
   private dockRo = new ResizeObserver(([e]) => this.style.setProperty('--sv-radar-dock-h', `${e.borderBoxSize[0].blockSize}px`));
@@ -55,8 +56,12 @@ export class SvApp extends SvElement {
       } else if (e.key === 'Tab' && e.ctrlKey && st.settingsOpen) {
         e.preventDefault();
         nextTab(e.shiftKey ? -1 : 1);
+      } else if (e.key === 'Escape' && (st.addWidgetsOpen || st.locationsOpen)) {
+        store.set({ addWidgetsOpen: false, locationsOpen: false });
       } else if (e.key === 'Escape' && (st.settingsOpen || st.assistantOpen)) {
         store.set({ settingsOpen: false, assistantOpen: false });
+      } else if (e.key === 'Escape' && st.editingWidgets) {
+        store.set({ editingWidgets: false });
       } else if (typing(e) || e.ctrlKey || e.metaKey || e.altKey) {
         return;
       } else if (e.key === '+' || e.key === '=' || e.key === '-') {
@@ -72,7 +77,7 @@ export class SvApp extends SvElement {
   }
 
   private toolbar(compact: boolean) {
-    const [, , , , layer, settingsOpen, , satellite] = this.s.value;
+    const [, , , , layer, settingsOpen, , satellite, , lightningOn] = this.s.value;
     return html`<m3e-toolbar variant="standard" shape="rounded" elevated class="sv-toolbar ${compact ? 'compact' : ''}">
       ${compact
         ? nothing
@@ -89,6 +94,9 @@ export class SvApp extends SvElement {
       </m3e-button-group>
       <m3e-icon-button toggle ?selected=${satellite} aria-label="Satellite imagery" @beforeinput=${stateDriven} @click=${() => store.set({ showSatellite: !store.get().showSatellite })}>
         <m3e-icon name="satellite_alt"></m3e-icon><m3e-icon slot="selected" name="satellite_alt" filled></m3e-icon>
+      </m3e-icon-button>
+      <m3e-icon-button toggle ?selected=${lightningOn} aria-label="Lightning strikes" title="Live lightning" @beforeinput=${stateDriven} @click=${() => store.set({ showLightning: !store.get().showLightning })}>
+        <m3e-icon name="bolt"></m3e-icon><m3e-icon slot="selected" name="bolt" filled></m3e-icon>
       </m3e-icon-button>
       ${compact
         ? nothing
@@ -138,7 +146,7 @@ export class SvApp extends SvElement {
     const [ready, narrow, compactPref, compactTab, layer, settingsOpen, side] = this.s.value;
     const compact = narrow && compactPref;
     return html`
-      <div class="sv-app" data-side=${side} data-compact=${compact} data-tab=${compactTab} data-ready=${ready}>
+      <div class="sv-app" data-side=${side} data-compact=${compact} data-tab=${compactTab} data-ready=${ready} data-editing=${this.s.value[10]}>
         <sv-map></sv-map>
         ${compact
           ? html`
@@ -166,6 +174,8 @@ export class SvApp extends SvElement {
             `}
         <sv-assistant></sv-assistant>
         <sv-settings></sv-settings>
+        <sv-add-widgets></sv-add-widgets>
+        <sv-places></sv-places>
         <sv-dialogs></sv-dialogs>
         ${ready ? nothing : html`<div class="sv-splash"><m3e-loading-indicator variant="contained"></m3e-loading-indicator></div>`}
       </div>

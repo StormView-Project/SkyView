@@ -9,7 +9,8 @@ import { api } from '../lib/api';
 import { setLocation } from '../lib/data';
 import { aqiCategory, harmonize, mix, SEVERITY_ORDER } from '../lib/format';
 import { $, store, StoreController } from '../lib/store';
-import type { Alert, RadarFrame } from '../lib/types';
+import { KEEP_MS, lightning } from '../lib/lightning';
+import type { Alert, LightningStrike, RadarFrame } from '../lib/types';
 import { copyText, openExternal, SvElement, toast } from '../lib/ui';
 import {
   isRadarWasmAvailable, onRadarWasmFailure, rawTileTemplate, registerRadarProtocol, wasmTileUrl,
@@ -283,6 +284,7 @@ export class SvMap extends SvElement {
       ) this.updateRadar();
       if (st.radarOpacity !== prev.radarOpacity) this.applyRadarOpacity();
       if (st.showSatellite !== prev.showSatellite) this.updateSatellite();
+      if (st.showLightning !== prev.showLightning) this.updateLightning();
       if (st.showAlertPolygons !== prev.showAlertPolygons || st.showAdvisories !== prev.showAdvisories) this.loadAlertPolygons();
       if (st.mapLayer !== prev.mapLayer) this.updateAqi();
       if (st.tokens !== prev.tokens) {
@@ -335,6 +337,7 @@ export class SvMap extends SvElement {
     this.radarKeys.clear();
     if (this.styleKind === 'material') this.recolorBase();
     this.updateSatellite();
+    this.updateLightning();
     this.updateRadar();
     this.updateAqi();
     this.loadAlertPolygons(true);
@@ -367,6 +370,62 @@ export class SvMap extends SvElement {
   }
 
   /* ---------------------------------------------------------- satellite */
+
+  /* ----------------------------------------------------------- lightning */
+
+  private lightningUnsub: (() => void) | null = null;
+
+  /** Live strikes as dots that fade from white-hot to orange over 15 minutes. */
+  private updateLightning() {
+    if (!this.styleReady) return;
+    const on = $().showLightning;
+    if (!on) {
+      this.lightningUnsub?.();
+      this.lightningUnsub = null;
+      lightning.stop();
+      if (this.map.getLayer('sv-lightning')) this.map.removeLayer('sv-lightning');
+      if (this.map.getSource('sv-lightning')) this.map.removeSource('sv-lightning');
+      return;
+    }
+    if (!this.map.getSource('sv-lightning')) {
+      this.map.addSource('sv-lightning', {
+        type: 'geojson', data: { type: 'FeatureCollection', features: [] },
+        attribution: 'Lightning © <a href="https://www.blitzortung.org">Blitzortung.org</a> contributors',
+      });
+    }
+    if (!this.map.getLayer('sv-lightning')) {
+      const age = ['get', 'age'];
+      this.map.addLayer({
+        id: 'sv-lightning', type: 'circle', source: 'sv-lightning',
+        paint: {
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 3, 2.5, 7, 4, 11, 6],
+          'circle-color': ['interpolate', ['linear'], age, 0, '#ffffff', 1, '#fff27a', 5, '#ffb000', 15, '#ff5a1f'] as never,
+          'circle-opacity': ['interpolate', ['linear'], age, 0, 1, 15, 0.25] as never,
+          'circle-stroke-width': 1,
+          'circle-stroke-color': '#000000',
+          'circle-stroke-opacity': ['interpolate', ['linear'], age, 0, 0.6, 15, 0.15] as never,
+        },
+      }, ANCHOR_ALERTS);
+    }
+    if (!this.lightningUnsub) {
+      this.lightningUnsub = lightning.subscribe((strikes) => this.drawLightning(strikes));
+      lightning.start();
+    }
+  }
+
+  private drawLightning(strikes: LightningStrike[]) {
+    const src = this.map.getSource('sv-lightning') as GeoJSONSource | undefined;
+    if (!src) return;
+    const now = Date.now();
+    src.setData({
+      type: 'FeatureCollection',
+      features: strikes.map((st) => ({
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [st.lon, st.lat] },
+        properties: { age: Math.min(KEEP_MS, now - st.time) / 60_000 },
+      })),
+    });
+  }
 
   private updateSatellite() {
     const on = $().showSatellite;

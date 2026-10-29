@@ -4,7 +4,7 @@
  * assistant.rs) — all of these services send permissive CORS headers.
  */
 import type {
-  AirQuality, Alert, AqiPoint, ChatMessage, Current, Day, Hour, OutlookDay, Place, RadarFrame, WeatherData,
+  AirQuality, Alert, AqiPoint, ChatMessage, ClimateDay, Current, Day, Hour, Nowcast, OutlookDay, Place, RadarFrame, WeatherData,
 } from './types';
 
 const OPEN_METEO = 'https://api.open-meteo.com/v1/forecast';
@@ -12,6 +12,7 @@ const NWS = 'https://api.weather.gov';
 const NOMINATIM = 'https://nominatim.openstreetmap.org';
 const AIR_QUALITY = 'https://air-quality-api.open-meteo.com/v1/air-quality';
 const SEASONAL = 'https://seasonal-api.open-meteo.com/v1/seasonal';
+const ARCHIVE = 'https://archive-api.open-meteo.com/v1/archive';
 const LIBREWXR_API = 'https://api.librewxr.net/public/weather-maps.json';
 const LIBREWXR_HOST = 'https://api.librewxr.net';
 const NWS_ACTIVE = 'https://api.weather.gov/alerts/active?status=actual&message_type=alert,update';
@@ -88,7 +89,7 @@ export async function fetchOpenMeteo(lat: number, lon: number, units: Units): Pr
   const current = 'temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,cloud_cover,' +
     'pressure_msl,surface_pressure,wind_speed_10m,wind_direction_10m,wind_gusts_10m,visibility,uv_index,dew_point_2m,is_day';
   const hourly = 'temperature_2m,apparent_temperature,precipitation_probability,weather_code,wind_speed_10m,' +
-    'wind_direction_10m,is_day,uv_index,precipitation,visibility,relative_humidity_2m,surface_pressure';
+    'wind_direction_10m,wind_gusts_10m,is_day,uv_index,precipitation,visibility,relative_humidity_2m,surface_pressure';
   const daily = 'weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,' +
     'precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max,sunrise,sunset,uv_index_max,' +
     'shortwave_radiation_sum';
@@ -138,6 +139,7 @@ export async function fetchOpenMeteo(lat: number, lon: number, units: Units): Pr
       windSpeed: round(at(hr, 'wind_speed_10m', i)),
       windDirection: dir,
       windDirectionLabel: dir == null ? null : windLabel(dir),
+      windGusts: round(at(hr, 'wind_gusts_10m', i)),
       uvIndex: at(hr, 'uv_index', i),
       visibility: visibility(at(hr, 'visibility', i) ?? 0, units),
       humidity: at(hr, 'relative_humidity_2m', i),
@@ -332,6 +334,7 @@ export async function fetchNws(lat: number, lon: number, units: Units): Promise<
       windSpeed: units === 'imperial' ? Math.round(mph) : Math.round(mph * 1.609),
       windDirection: null,
       windDirectionLabel: h.windDirection ?? null,
+      windGusts: null,
       uvIndex: null,
       visibility: null,
       humidity: round(num(h.relativeHumidity?.value)),
@@ -510,6 +513,76 @@ export async function futureRange(lat: number, lon: number, start: string, end: 
     })
     // Dates at the edge of the model's range come back present but empty.
     .filter((x: OutlookDay) => x.tempMax != null || x.tempMin != null || x.precipSum != null);
+}
+
+/* ------------------------------------------------------- 15-minute nowcast */
+
+/**
+ * Precipitation for the next ~2 hours in 15-minute steps. Open-Meteo blends
+ * high-resolution models (HRRR in the US, ICON-D2 / AROME in Europe) and
+ * interpolates hourly data elsewhere. Used whatever the forecast provider is.
+ */
+export async function fetchNowcast(lat: number, lon: number, units: Units): Promise<Nowcast> {
+  const { p } = unitParams(units);
+  const d = await getJson(`${OPEN_METEO}?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}` +
+    `&minutely_15=precipitation,precipitation_probability,snowfall&past_minutely_15=1&forecast_minutely_15=10` +
+    `&precipitation_unit=${p}&timezone=auto&timeformat=unixtime`, undefined, 15_000);
+  const m = d.minutely_15 ?? {};
+  const steps = (m.time ?? []).map((t: number, i: number) => ({
+    time: t * 1000,
+    precip: at(m, 'precipitation', i) ?? 0,
+    prob: at(m, 'precipitation_probability', i),
+    snow: (at(m, 'snowfall', i) ?? 0) > 0,
+  }));
+  return { steps, fetchedAt: Date.now() };
+}
+
+/* ------------------------------------------------------- historical climate */
+
+/**
+ * Normals and records for every day of the year, from Open-Meteo's ERA5 archive
+ * (1991 through last year). A normal is the average over a ±3-day window across
+ * all years, which smooths out single odd days; records are for the exact date.
+ * ~360 KB to download, so callers should cache the (much smaller) result.
+ */
+export async function fetchClimate(lat: number, lon: number): Promise<ClimateDay[]> {
+  const lastYear = new Date().getFullYear() - 1;
+  const d = await getJson(`${ARCHIVE}?latitude=${lat.toFixed(2)}&longitude=${lon.toFixed(2)}` +
+    `&start_date=1991-01-01&end_date=${lastYear}-12-31&daily=temperature_2m_max,temperature_2m_min,precipitation_sum` +
+    '&timezone=auto', undefined, 60_000);
+  const dl = d.daily ?? {};
+  const times: string[] = dl.time ?? [];
+  // Index 0..365 by month-day so leap years line up (Feb 29 = 59).
+  const doy = (iso: string) => {
+    const [, mm, dd] = iso.split('-').map(Number);
+    return Math.round((Date.UTC(2000, mm - 1, dd) - Date.UTC(2000, 0, 1)) / 86_400_000);
+  };
+  type Acc = { hi: number[]; lo: number[]; pr: number[]; rh: number; rhY: number; rl: number; rlY: number };
+  const acc: Acc[] = Array.from({ length: 366 }, () => ({ hi: [], lo: [], pr: [], rh: -Infinity, rhY: 0, rl: Infinity, rlY: 0 }));
+  times.forEach((iso, i) => {
+    const hi = at(dl, 'temperature_2m_max', i), lo = at(dl, 'temperature_2m_min', i), pr = at(dl, 'precipitation_sum', i);
+    const a = acc[doy(iso)];
+    const year = Number(iso.slice(0, 4));
+    if (hi != null) { a.hi.push(hi); if (hi > a.rh) { a.rh = hi; a.rhY = year; } }
+    if (lo != null) { a.lo.push(lo); if (lo < a.rl) { a.rl = lo; a.rlY = year; } }
+    if (pr != null) a.pr.push(pr);
+  });
+  const mean = (xs: number[]) => (xs.length ? xs.reduce((s, x) => s + x, 0) / xs.length : NaN);
+  const window = (k: number, pick: (a: Acc) => number[]) => {
+    const vals: number[] = [];
+    for (let o = -3; o <= 3; o++) vals.push(...pick(acc[(k + o + 366) % 366]));
+    return mean(vals);
+  };
+  return acc.map((a, k) => ({
+    normalHigh: window(k, (x) => x.hi),
+    normalLow: window(k, (x) => x.lo),
+    recordHigh: a.rh,
+    recordHighYear: a.rhY,
+    recordLow: a.rl,
+    recordLowYear: a.rlY,
+    normalPrecip: window(k, (x) => x.pr),
+    years: a.hi.length,
+  }));
 }
 
 /* ---------------------------------------------------------------- radar */

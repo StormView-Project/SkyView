@@ -293,6 +293,181 @@ function draw(g: CanvasRenderingContext2D, W: number, H: number, s: SceneInfo, t
 
 /* ------------------------------------------------------------- element */
 
+/* ------------------------------------------------------------ seasons */
+
+export type Season = 'spring' | 'summer' | 'fall' | 'winter';
+
+/** The season for a setting value: 'auto' follows the date and hemisphere. */
+export function resolveSeason(setting: string, lat: number | undefined, date = new Date()): Season | null {
+  if (setting === 'off') return null;
+  if (setting !== 'auto') return setting as Season;
+  const seasons: Season[] = ['winter', 'spring', 'summer', 'fall'];
+  let i = Math.floor(((date.getMonth() + 1) % 12) / 3); // Dec–Feb = 0 (northern winter)
+  if ((lat ?? 0) < 0) i = (i + 2) % 4; // southern hemisphere: opposite seasons
+  return seasons[i];
+}
+
+interface SeasonPalette {
+  petal: string; petalDark: string;
+  leaves: string[];
+  firefly: string; mote: string;
+  ice: string; iceEdge: string; glint: string; frost: string;
+}
+
+function seasonPalette(primary: string, dark: boolean): SeasonPalette {
+  const hue = (hex: string) => Hct.fromInt(Blend.harmonize(argbFromHex(hex), argbFromHex(primary))).hue;
+  const c = (hex: string, chroma: number, tone: number) => hexFromArgb(Hct.from(hue(hex), chroma, tone).toInt());
+  return {
+    petal: c('#f6a6c1', 40, dark ? 82 : 88),
+    petalDark: c('#f6a6c1', 50, dark ? 70 : 76),
+    leaves: [c('#e8590c', 70, dark ? 62 : 58), c('#c92a2a', 64, dark ? 56 : 50), c('#f59f00', 72, dark ? 72 : 70), c('#a0522d', 44, dark ? 52 : 46)],
+    firefly: c('#d8f36a', 70, 90),
+    mote: c('#ffb84d', dark ? 40 : 60, dark ? 86 : 74),
+    ice: c('#bfe6ff', 18, dark ? 86 : 96),
+    iceEdge: c('#bfe6ff', 26, dark ? 66 : 78),
+    glint: '#ffffff',
+    frost: c('#dff3ff', 12, dark ? 94 : 99),
+  };
+}
+
+const LEAF = new Path2D('M 0 -10 C 7 -6 8 4 0 10 C -8 4 -7 -6 0 -10 Z M 0 10 L 0 14');
+const SPARKLE = new Path2D('M 0 -5 L 1.2 -1.2 L 5 0 L 1.2 1.2 L 0 5 L -1.2 1.2 L -5 0 L -1.2 -1.2 Z');
+
+/** The seasonal layer, drawn over the weather. Subtle on purpose: it's decoration. */
+function drawSeason(g: CanvasRenderingContext2D, W: number, H: number, season: Season, night: boolean, wind: number, t: number, p: SeasonPalette) {
+  if (season === 'spring') {
+    // Cherry blossom petals flutter down and across with the wind.
+    for (let i = 0; i < 14; i++) {
+      const u = hash(i + 11.3), v = hash(i + 4.9);
+      const period = 9 + 6 * v;
+      const q = fract(t / period + u);
+      // Kept to the right of the temperature so the numbers are never covered.
+      const x = W * 0.42 + ((u * W * 0.7 + q * W * (0.2 + wind * 0.3) + 14 * sin(t * (50 + 30 * v) + i * 40)) % (W * 0.6 + 20)) - 10;
+      const y = -12 + q * (H + 24);
+      g.save();
+      g.globalAlpha = 0.85 * fade(q);
+      g.translate(x, y);
+      g.rotate((t * (60 + 80 * v) + i * 47) * DEG);
+      g.scale(Math.cos((t * (120 + 90 * u) + i * 30) * DEG), 1); // flutter
+      g.fillStyle = i % 3 ? p.petal : p.petalDark;
+      g.beginPath();
+      g.ellipse(0, 0, 4.5, 2.6, 0, 0, Math.PI * 2);
+      g.fill();
+      g.restore();
+    }
+  } else if (season === 'summer') {
+    if (night) {
+      // Fireflies wander and pulse.
+      for (let i = 0; i < 12; i++) {
+        const u = hash(i + 2.2), v = hash(i + 8.8);
+        const x = W * (0.45 + 0.5 * u) + 22 * sin(t * (9 + 7 * v) + i * 60) + 10 * sin(t * 23 + i * 13);
+        const y = H * (0.35 + 0.55 * v) + 14 * sin(t * (11 + 6 * u) + i * 90);
+        const glow = Math.max(0, sin(t * (70 + 50 * u) + i * 77)) ** 2;
+        if (glow < 0.02) continue;
+        radial(g, x, y, 22, [[0, withAlpha(p.firefly, 0.55 * glow)], [1, withAlpha(p.firefly, 0)]]);
+        g.globalAlpha = glow;
+        g.fillStyle = p.firefly;
+        g.beginPath();
+        g.arc(x, y, 1.8, 0, Math.PI * 2);
+        g.fill();
+        g.globalAlpha = 1;
+      }
+    } else {
+      // Warm motes of light drift slowly upward.
+      for (let i = 0; i < 14; i++) {
+        const u = hash(i + 6.1), v = hash(i + 1.4);
+        const q = fract(t / (14 + 8 * v) + u);
+        const x = W * (0.45 + 0.52 * u) + 10 * sin(t * 15 + i * 50);
+        const y = H * (1.05 - q * 1.1);
+        g.globalAlpha = 0.85 * fade(q) * (0.6 + 0.4 * sin(t * 40 + i * 30));
+        radial(g, x, y, 14, [[0, p.mote], [0.35, withAlpha(p.mote, 0.6)], [1, withAlpha(p.mote, 0)]]);
+      }
+      g.globalAlpha = 1;
+    }
+  } else if (season === 'fall') {
+    // Leaves tumble down, swaying side to side.
+    for (let i = 0; i < 10; i++) {
+      const u = hash(i + 3.7), v = hash(i + 9.4);
+      const period = 10 + 7 * v;
+      const q = fract(t / period + u);
+      const x = W * 0.42 + ((W * 0.6 * u + q * W * wind * 0.3 + 26 * sin(t * (28 + 20 * v) + i * 70)) % (W * 0.6 + 20)) - 10;
+      const y = -16 + q * (H + 32);
+      const size = 0.75 + 0.5 * v;
+      g.save();
+      g.globalAlpha = 0.9 * fade(q);
+      g.translate(x, y);
+      g.rotate((40 * sin(t * (40 + 30 * u) + i * 50) + i * 37) * DEG);
+      g.scale(size * Math.cos((t * (80 + 60 * v) + i * 25) * DEG), size); // 3D tumble
+      g.fillStyle = p.leaves[i % p.leaves.length];
+      g.strokeStyle = p.leaves[(i + 3) % p.leaves.length];
+      g.lineWidth = 1;
+      g.fill(LEAF);
+      g.stroke(LEAF);
+      g.restore();
+    }
+  } else if (season === 'winter') {
+    // Frosted corners — winter without implying snowfall.
+    radial(g, 0, 0, Math.min(W, H) * 0.9, [[0, withAlpha(p.frost, 0.32)], [0.6, withAlpha(p.frost, 0.08)], [1, withAlpha(p.frost, 0)]]);
+    radial(g, W, H, Math.min(W, H) * 0.8, [[0, withAlpha(p.frost, 0.22)], [0.6, withAlpha(p.frost, 0.05)], [1, withAlpha(p.frost, 0)]]);
+    // Icicles along the top edge, with glints sliding down and the odd drip.
+    const n = Math.max(8, Math.round(W / 26));
+    for (let i = 0; i < n; i++) {
+      const u = hash(i + 5.5), v = hash(i + 7.3);
+      const x = (i + 0.5) * (W / n) + (u - 0.5) * 8;
+      const len = 10 + 26 * v * v;
+      const w = 4 + 4 * u;
+      const grad = g.createLinearGradient(x, 0, x, len);
+      grad.addColorStop(0, withAlpha(p.ice, 0.95));
+      grad.addColorStop(1, withAlpha(p.iceEdge, 0.7));
+      g.fillStyle = grad;
+      g.beginPath();
+      g.moveTo(x - w / 2, 0);
+      g.quadraticCurveTo(x - w / 4, len * 0.6, x, len);
+      g.quadraticCurveTo(x + w / 4, len * 0.6, x + w / 2, 0);
+      g.closePath();
+      g.fill();
+      // Glint sliding down every few seconds.
+      const gq = fract(t / (3.5 + 3 * u) + v);
+      if (gq < 0.4) {
+        const gy = (gq / 0.4) * len * 0.85;
+        g.globalAlpha = Math.sin((gq / 0.4) * Math.PI) * 0.9;
+        g.fillStyle = p.glint;
+        g.beginPath();
+        g.ellipse(x - w * 0.12, gy, 0.9, 2.4, 0, 0, Math.PI * 2);
+        g.fill();
+        g.globalAlpha = 1;
+      }
+      // A drip now and then from the longer ones.
+      if (len > 24) {
+        const dq = fract(t / (6 + 5 * u) + u);
+        if (dq < 0.25) {
+          const dy = len + (dq / 0.25) ** 2 * (H - len) * 0.5;
+          g.globalAlpha = 1 - dq / 0.25;
+          g.fillStyle = p.iceEdge;
+          g.beginPath();
+          g.ellipse(x, dy, 1.4, 2.2, 0, 0, Math.PI * 2);
+          g.fill();
+          g.globalAlpha = 1;
+        }
+      }
+    }
+    // Frost sparkles twinkling low in the scene.
+    for (let i = 0; i < 10; i++) {
+      const u = hash(i + 12.1), v = hash(i + 3.3);
+      const tw = Math.max(0, sin(t * (45 + 40 * v) + i * 63)) ** 3;
+      if (tw < 0.05) continue;
+      g.save();
+      g.globalAlpha = tw;
+      g.translate(W * (0.04 + 0.92 * u), H * (0.62 + 0.34 * v));
+      g.rotate((t * 20 + i * 30) * DEG);
+      g.scale(0.6 + 0.6 * tw, 0.6 + 0.6 * tw);
+      g.fillStyle = p.glint;
+      g.fill(SPARKLE);
+      g.restore();
+    }
+  }
+}
+
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
 @customElement('sv-scene')
@@ -302,6 +477,9 @@ export class SvScene extends SvElement {
   @property({ type: Number }) windMph = 0;
   /** Changes whenever the theme does, so colors are recomputed. */
   @property({ attribute: false }) tokens: Record<string, string> = {};
+  /** Seasonal touches layered over the weather, or null for none. */
+  @property({ attribute: false }) season: Season | null = null;
+  private palette: SeasonPalette | null = null;
 
   @query('canvas') private canvas!: HTMLCanvasElement;
   private info: SceneInfo | null = null;
@@ -322,6 +500,7 @@ export class SvScene extends SvElement {
 
   willUpdate() {
     this.info = sceneInfo(this.code, this.day, this.windMph, $().tokens.primary ?? '#4f8ef5', $().isDark);
+    this.palette = this.season ? seasonPalette($().tokens.primary ?? '#4f8ef5', $().isDark) : null;
   }
 
   firstUpdated() {
@@ -381,5 +560,6 @@ export class SvScene extends SvElement {
     g.setTransform(dpr * k, 0, 0, dpr * k, 0, 0);
     const t = reducedMotion.matches ? 2 : (performance.now() - this.start) / 1000;
     draw(g, cssW / k, cssH / k, this.info, t);
+    if (this.season && this.palette) drawSeason(g, cssW / k, cssH / k, this.season, !this.day, this.info.wind, t, this.palette);
   }
 }

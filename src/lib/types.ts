@@ -42,6 +42,7 @@ export interface Hour {
   windSpeed: number | null;
   windDirection: number | null;
   windDirectionLabel: string | null;
+  windGusts: number | null;
   uvIndex: number | null;
   visibility: number | null;
   humidity: number | null;
@@ -137,4 +138,35 @@ export interface AqiPoint {
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
+}
+
+/** One 15-minute precipitation step. `precip` is in the user's units (in or mm). */
+export interface NowcastStep {
+  time: number;
+  precip: number;
+  prob: number | null;
+  snow: boolean;
+}
+
+export interface Nowcast {
+  steps: NowcastStep[];
+  fetchedAt: number;
+}
+
+/** Day-of-year climate stats from the 1991–last-year archive. Temperatures in °C, precip in mm. */
+export interface ClimateDay {
+  normalHigh: number;
+  normalLow: number;
+  recordHigh: number;
+  recordHighYear: number;
+  recordLow: number;
+  recordLowYear: number;
+  normalPrecip: number;
+  years: number;
+}
+
+export interface LightningStrike {
+  time: number; // epoch ms
+  lat: number;
+  lon: number;
 }

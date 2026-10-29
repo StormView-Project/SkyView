@@ -1,6 +1,6 @@
 import type { ReactiveController, ReactiveControllerHost } from 'lit';
 import { api } from './api';
-import type { Alert, Place, RadarFrame, WeatherData } from './types';
+import type { Alert, Nowcast, Place, RadarFrame, WeatherData } from './types';
 
 /* ------------------------------------------------------------------ widgets */
 
@@ -20,13 +20,42 @@ export const WIDGET_LABELS = {
   outlook: "Today's Outlook",
   futureWeather: 'Future Weather',
   monthOutlook: 'Month Outlook',
+  rainNow: 'Rain in the Next Hour',
+  tempGraph: 'Temperature Graph',
+  windGusts: 'Wind & Gusts',
+  climate: 'Historical Climate',
 } as const;
 
 export type WidgetId = keyof typeof WIDGET_LABELS;
 
+/** Icon + one-line description for each widget, shown in the Add widgets sheet. */
+export const WIDGET_INFO: Record<WidgetId, { icon: string; desc: string }> = {
+  alerts: { icon: 'warning', desc: 'Active NWS warnings and advisories for your location.' },
+  hourly: { icon: 'schedule', desc: 'The next 24 hours at a glance. Tap an hour for details.' },
+  daily: { icon: 'calendar_month', desc: 'Highs, lows and rain chances for the week.' },
+  sunrise: { icon: 'wb_twilight', desc: 'Today\'s sunrise and sunset times.' },
+  details: { icon: 'info', desc: 'Humidity, wind, pressure, visibility, UV and more.' },
+  aqi: { icon: 'air', desc: 'US air quality index with a pollutant breakdown.' },
+  windCompass: { icon: 'explore', desc: 'Wind speed and direction on a compass.' },
+  feelsLike: { icon: 'thermostat', desc: 'How the temperature actually feels, and why.' },
+  precipOutlook: { icon: 'umbrella', desc: 'Rain chances for the next 8 hours.' },
+  daylight: { icon: 'clear_day', desc: 'Hours of daylight and the sun\'s progress today.' },
+  uvIndex: { icon: 'sunny', desc: 'Current UV level with sun protection advice.' },
+  moonPhase: { icon: 'dark_mode', desc: 'Tonight\'s moon phase and illumination.' },
+  outlook: { icon: 'tips_and_updates', desc: 'Quick tips: umbrella, sunscreen, bundle up.' },
+  futureWeather: { icon: 'event_upcoming', desc: 'A long-range outlook for any date up to 7 months out.' },
+  monthOutlook: { icon: 'date_range', desc: 'A day-by-day outlook for a whole month.' },
+  rainNow: { icon: 'rainy', desc: 'When rain starts and stops over the next two hours, in 15-minute steps.' },
+  tempGraph: { icon: 'show_chart', desc: 'Temperature and feels-like for the next 24 hours, with rain chances.' },
+  windGusts: { icon: 'wind_power', desc: 'Wind speed, gusts and direction hour by hour.' },
+  climate: { icon: 'history', desc: 'Today\'s normal high and low, and the record extremes since 1991.' },
+};
+
 export const DEFAULT_WIDGETS: { id: WidgetId; enabled: boolean }[] = [
   { id: 'alerts', enabled: true },
+  { id: 'rainNow', enabled: true },
   { id: 'hourly', enabled: true },
+  { id: 'tempGraph', enabled: true },
   { id: 'daily', enabled: true },
   { id: 'sunrise', enabled: true },
   { id: 'details', enabled: true },
@@ -40,6 +69,8 @@ export const DEFAULT_WIDGETS: { id: WidgetId; enabled: boolean }[] = [
   { id: 'outlook', enabled: false },
   { id: 'futureWeather', enabled: false },
   { id: 'monthOutlook', enabled: false },
+  { id: 'windGusts', enabled: false },
+  { id: 'climate', enabled: false },
 ];
 
 export const DETAILS_FIELD_LABELS = {
@@ -58,6 +89,8 @@ export type DetailsField = keyof typeof DETAILS_FIELD_LABELS;
 
 /* ----------------------------------------------------------------- settings */
 
+export type Season = 'spring' | 'summer' | 'fall' | 'winter';
+
 export type ThemeVariant =
   | 'tonal-spot' | 'expressive' | 'vibrant' | 'fidelity' | 'content'
   | 'neutral' | 'monochrome' | 'rainbow' | 'fruit-salad';
@@ -73,6 +106,8 @@ export interface Settings {
   mapStyle: 'material' | 'streets';
   pressStyle: 'morph' | 'ripple' | 'both';
   weatherScene: boolean;        // animated scene behind the hero
+  sceneSeason: 'auto' | 'off' | Season; // seasonal touches in the scene (auto = by date and hemisphere)
+  haptics: boolean;             // vibration feedback on presses (Android) / system haptics (iOS 18+)
   // Layout
   sidebarPosition: 'left' | 'right';
   compactLayout: boolean;       // the phone layout (bottom navigation bar), used for narrow windows
@@ -84,6 +119,7 @@ export interface Settings {
   weatherAPI: 'openmeteo' | 'nws';
   units: 'imperial' | 'metric';
   location: Place | null;
+  savedLocations: Place[];
   // Radar (LibreWXR)
   mapLayer: 'radar' | 'aqi';
   radarOpacity: number;
@@ -98,11 +134,13 @@ export interface Settings {
   showAlertPolygons: boolean;
   showAdvisories: boolean;
   showArrows: boolean;
+  showLightning: boolean;       // live strikes from Blitzortung.org
   mapZoom: number;
   // Alerts / notifications
   notificationsEnabled: boolean;
   notifNws: boolean;
   notifAqi: boolean;
+  notifRain: boolean;           // "rain starting soon" from the 15-minute nowcast
   // Weather assistant
   assistantProvider: 'ollama' | 'openai' | 'webllm';
   assistantBaseUrl: string;
@@ -121,6 +159,8 @@ export const DEFAULT_SETTINGS: Settings = {
   mapStyle: 'material',
   pressStyle: 'morph',
   weatherScene: true,
+  sceneSeason: 'auto',
+  haptics: true,
   sidebarPosition: 'left',
   compactLayout: true,
   widgets: DEFAULT_WIDGETS,
@@ -132,6 +172,7 @@ export const DEFAULT_SETTINGS: Settings = {
   weatherAPI: 'openmeteo',
   units: 'imperial',
   location: null,
+  savedLocations: [],
   mapLayer: 'radar',
   radarOpacity: 0.75,
   radarTileQuality: 512,
@@ -145,10 +186,12 @@ export const DEFAULT_SETTINGS: Settings = {
   showAlertPolygons: true,
   showAdvisories: false,
   showArrows: false,
+  showLightning: false,
   mapZoom: 7,
   notificationsEnabled: false,
   notifNws: true,
   notifAqi: true,
+  notifRain: true,
   assistantProvider: 'ollama',
   assistantBaseUrl: 'http://localhost:11434',
   assistantModel: '',
@@ -170,6 +213,10 @@ export interface Runtime {
   weather: WeatherData | null;
   weatherLoading: boolean;
   weatherError: string | null;
+  /** Network is down and the forecast on screen is the last one saved. */
+  offline: boolean;
+  /** Precipitation in 15-minute steps for the next couple of hours (Open-Meteo). */
+  nowcast: Nowcast | null;
   alerts: Alert[];
   radarFrames: RadarFrame[];
   radarIdx: number;
@@ -192,6 +239,10 @@ export interface Runtime {
   betaOpen: boolean;
   downloadsOpen: boolean;
   assistantOpen: boolean;
+  /** Home-screen edit mode: drag to reorder, remove, add widgets. */
+  editingWidgets: boolean;
+  addWidgetsOpen: boolean;
+  locationsOpen: boolean;
 }
 
 export type State = Settings & Runtime;
@@ -201,6 +252,8 @@ const RUNTIME: Runtime = {
   weather: null,
   weatherLoading: false,
   weatherError: null,
+  offline: false,
+  nowcast: null,
   alerts: [],
   radarFrames: [],
   radarIdx: 0,
@@ -220,6 +273,9 @@ const RUNTIME: Runtime = {
   betaOpen: false,
   downloadsOpen: false,
   assistantOpen: false,
+  editingWidgets: false,
+  addWidgetsOpen: false,
+  locationsOpen: false,
 };
 
 export const SETTINGS_KEYS = Object.keys(DEFAULT_SETTINGS) as (keyof Settings)[];
@@ -262,7 +318,9 @@ class Store {
     if (Array.isArray(saved.widgets)) {
       const valid = saved.widgets.filter((w) => DEFAULT_WIDGETS.some((d) => d.id === w.id));
       const ids = new Set(valid.map((w) => w.id));
-      merged.widgets = [...valid, ...DEFAULT_WIDGETS.filter((d) => !ids.has(d.id))];
+      // Widget types added since this layout was saved come in switched off, so an
+      // existing home screen never changes by itself; they're in Add widgets.
+      merged.widgets = [...valid, ...DEFAULT_WIDGETS.filter((d) => !ids.has(d.id)).map((d) => ({ ...d, enabled: false }))];
     }
     merged.detailsFields = { ...DEFAULT_SETTINGS.detailsFields, ...(saved.detailsFields ?? {}) };
     this.set({ ...merged, ready: true });

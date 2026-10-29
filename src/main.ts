@@ -42,6 +42,7 @@ import { errorText } from './lib/api';
 import { startData } from './lib/data';
 import { store } from './lib/store';
 import { initTheme } from './lib/theme';
+import { initHaptics } from './lib/haptics';
 import { initPressFx, openExternal, toast } from './lib/ui';
 import './components/sv-app';
 
@@ -71,6 +72,7 @@ window.addEventListener('error', (e) => reportError(e.error ?? e.message));
   await store.hydrate();
   initTheme();
   initPressFx();
+  initHaptics();
   // Press animation style + browser chrome color follow the settings/theme.
   const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
   const sync = () => {
@@ -84,3 +86,11 @@ window.addEventListener('error', (e) => reportError(e.error ?? e.message));
   sync();
   startData();
 })();
+
+// Offline support + notifications on Android (see public/sw.js). Not in dev, where
+// a cached app shell would fight Vite's hot reload.
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch((e) => console.warn('[sw] registration failed', e));
+  });
+}

@@ -1,14 +1,54 @@
 import { api, errorText, notify } from './api';
 import { $, store } from './store';
-import type { Alert, Place } from './types';
+import { format } from 'date-fns';
+import type { Alert, ClimateDay, Place, WeatherData } from './types';
 
 const WEATHER_REFRESH = 10 * 60 * 1000;
 const ALERTS_REFRESH = 90 * 1000;
 const RADAR_REFRESH = 10 * 60 * 1000; // matches LibreWXR's fetch interval
+const NOWCAST_REFRESH = 5 * 60 * 1000;
 const FRAME_MS: Record<number, number> = { 0.5: 600, 1: 400, 2: 200 };
 
 let weatherSeq = 0;
 let allFrames: Awaited<ReturnType<typeof api.radarFrames>> = [];
+
+/* ------------------------------------------------- last-known forecast */
+
+// The last forecast is kept so the app opens instantly, and still shows
+// something useful with no connection.
+const LAST_KEY = 'skyview:last-weather';
+const placeKey = (p: Place) => `${p.lat.toFixed(3)},${p.lon.toFixed(3)}`;
+const weatherKey = () => {
+  const s = $();
+  return s.location ? `${placeKey(s.location)}|${s.weatherAPI}|${s.units}` : '';
+};
+
+/** Forecasts for the last few places viewed, newest first, so switching saved places is instant. */
+const LAST_MAX = 6;
+type LastWeather = { key: string; data: WeatherData }[];
+
+function readLast(): LastWeather {
+  try {
+    const v = JSON.parse(localStorage.getItem(LAST_KEY) ?? '[]');
+    return Array.isArray(v) ? v : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLastWeather(data: WeatherData) {
+  const key = weatherKey();
+  const list = [{ key, data }, ...readLast().filter((e) => e.key !== key)].slice(0, LAST_MAX);
+  try {
+    localStorage.setItem(LAST_KEY, JSON.stringify(list));
+  } catch { /* storage full or blocked */ }
+}
+
+/** The saved forecast, if there is one for the current location and units. */
+function lastWeather(): WeatherData | null {
+  const key = weatherKey();
+  return readLast().find((e) => e.key === key)?.data ?? null;
+}
 
 export async function refreshWeather() {
   const s = $();
@@ -18,11 +58,91 @@ export async function refreshWeather() {
   try {
     const data = await api.weather(s.location.lat, s.location.lon, s.weatherAPI, s.units);
     if (seq !== weatherSeq) return;
-    store.set({ weather: data, weatherLoading: false, weatherError: data.notice });
+    store.set({ weather: data, weatherLoading: false, weatherError: data.notice, offline: false });
+    saveLastWeather(data);
   } catch (e) {
     if (seq !== weatherSeq) return;
-    store.set({ weatherLoading: false, weatherError: errorText(e) || 'Failed to fetch weather data.' });
+    const shown = $().weather ?? lastWeather();
+    if (shown) {
+      // Keep the last forecast on screen and say how old it is.
+      const age = format(shown.fetchedAt, "EEE 'at' h:mm a");
+      store.set({
+        weather: shown, weatherLoading: false, offline: true,
+        weatherError: `${navigator.onLine ? "Couldn't reach the weather service" : "You're offline"} — showing the forecast from ${age}.`,
+      });
+    } else {
+      store.set({ weatherLoading: false, weatherError: errorText(e) || 'Failed to fetch weather data.' });
+    }
   }
+}
+
+/* ------------------------------------------------------- 15-minute nowcast */
+
+const RAIN_NOTICE_KEY = 'skyview:rain-notice';
+/** Rain this soon gets a notification... */
+const RAIN_SOON_MS = 45 * 60 * 1000;
+/** ...when at least this much falls in a 15-minute step (in or mm). */
+const rainThreshold = () => ($().units === 'metric' ? 0.2 : 0.01);
+
+export async function refreshNowcast() {
+  const loc = $().location;
+  if (!loc) return store.set({ nowcast: null });
+  try {
+    const nowcast = await api.nowcast(loc.lat, loc.lon, $().units);
+    if ($().location !== loc) return;
+    store.set({ nowcast });
+    notifyRainSoon();
+  } catch {
+    // Keep the previous nowcast; the widget says how old it is.
+  }
+}
+
+/** "Rain starting around 4:15 PM" — once per rain event, only while it's dry now. */
+function notifyRainSoon() {
+  const s = $();
+  if (!s.notificationsEnabled || !s.notifRain || !s.nowcast) return;
+  const now = Date.now();
+  const steps = s.nowcast.steps.filter((st) => st.time + 15 * 60_000 > now);
+  const wet = (st: { precip: number }) => st.precip >= rainThreshold();
+  if (!steps.length || wet(steps[0])) return;
+  const start = steps.find((st) => st.time - now <= RAIN_SOON_MS && wet(st));
+  if (!start) return;
+  let last = 0;
+  try {
+    last = Number(localStorage.getItem(RAIN_NOTICE_KEY) ?? 0);
+  } catch { /* storage blocked */ }
+  if (now - last < 2 * 60 * 60_000) return; // one notification per rain event
+  try {
+    localStorage.setItem(RAIN_NOTICE_KEY, String(now));
+  } catch { /* storage blocked */ }
+  const what = start.snow ? 'Snow' : 'Rain';
+  notify(`${what} starting around ${format(start.time, 'h:mm a')}`, `${what} is expected near ${placeName()} in the next ${Math.max(15, Math.round((start.time - now) / 60_000 / 5) * 5)} minutes.`);
+}
+
+/* ------------------------------------------------------- historical climate */
+
+const CLIMATE_TTL = 30 * 24 * 60 * 60_000;
+const climateMemo = new Map<string, Promise<ClimateDay[]>>();
+
+/** Day-of-year normals and records for a place, cached in localStorage for a month. */
+export function climateFor(place: Place): Promise<ClimateDay[]> {
+  const key = `skyview:climate:${place.lat.toFixed(2)},${place.lon.toFixed(2)}`;
+  const hit = climateMemo.get(key);
+  if (hit) return hit;
+  const p = (async () => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(key) ?? 'null');
+      if (saved && Date.now() - saved.at < CLIMATE_TTL) return saved.days as ClimateDay[];
+    } catch { /* fetch below */ }
+    const days = await api.climate(place.lat, place.lon);
+    try {
+      localStorage.setItem(key, JSON.stringify({ at: Date.now(), days }));
+    } catch { /* still works without the cache */ }
+    return days;
+  })();
+  p.catch(() => climateMemo.delete(key));
+  climateMemo.set(key, p);
+  return p;
 }
 
 /* ---------------------------------------------------------- notifications */
@@ -123,7 +243,27 @@ export function jumpToNow() {
 }
 
 export function setLocation(place: Place) {
-  store.set({ location: place, weather: null, alerts: [] });
+  store.set({ location: place, weather: null, alerts: [], nowcast: null, offline: false });
+  // Show this place's saved forecast (if any) while the fresh one loads.
+  const cached = lastWeather();
+  if (cached) store.set({ weather: cached });
+}
+
+/* ------------------------------------------------------------ saved places */
+
+const samePlace = (a: Place, b: Place) => Math.abs(a.lat - b.lat) < 0.01 && Math.abs(a.lon - b.lon) < 0.01;
+
+export function isSaved(place: Place | null) {
+  return !!place && $().savedLocations.some((p) => samePlace(p, place));
+}
+
+export function saveLocation(place: Place) {
+  if (isSaved(place)) return;
+  store.set({ savedLocations: [...$().savedLocations, place] });
+}
+
+export function removeSavedLocation(place: Place) {
+  store.set({ savedLocations: $().savedLocations.filter((p) => !samePlace(p, place)) });
 }
 
 /** How long to wait for a position once the browser has permission. */
@@ -196,6 +336,7 @@ export function startData() {
       refreshWeather();
     }
     if (s.location !== prev.location) refreshAlerts();
+    if (s.location !== prev.location || s.units !== prev.units) refreshNowcast();
     if (s.showNowcast !== prev.showNowcast) applyFrameFilter();
     if (
       s.radarPlaying !== prev.radarPlaying || s.radarSpeed !== prev.radarSpeed ||
@@ -203,10 +344,20 @@ export function startData() {
     ) restartPlayback();
   });
 
-  refreshWeather();
-  refreshAlerts();
-  refreshRadar();
+  // Open instantly with the last forecast for this place; the fresh one replaces it.
+  const cached = lastWeather();
+  if (cached) store.set({ weather: cached });
+
+  const refreshAll = () => {
+    refreshWeather();
+    refreshAlerts();
+    refreshRadar();
+    refreshNowcast();
+  };
+  refreshAll();
+  window.addEventListener('online', refreshAll);
   setInterval(refreshWeather, WEATHER_REFRESH);
   setInterval(refreshAlerts, ALERTS_REFRESH);
   setInterval(refreshRadar, RADAR_REFRESH);
+  setInterval(refreshNowcast, NOWCAST_REFRESH);
 }

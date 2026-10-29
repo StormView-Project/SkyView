@@ -17,6 +17,8 @@ export const api = {
   futureRange: (lat: number, lon: number, start: string, end: string, units: string) =>
     p.futureRange(lat, lon, start, end, units === 'metric' ? 'metric' : 'imperial'),
   radarFrames: p.radarFrames,
+  nowcast: (lat: number, lon: number, units: string) => p.fetchNowcast(lat, lon, units === 'metric' ? 'metric' : 'imperial'),
+  climate: p.fetchClimate,
   activeAlerts: p.activeAlerts,
   zoneGeometries: p.zoneGeometries,
   async loadSettings(): Promise<Record<string, unknown>> {
@@ -42,12 +44,21 @@ export const api = {
     p.assistantChat(provider, baseUrl, model, messages, onDelta),
 };
 
-export function notify(title: string, body: string) {
+export async function notify(title: string, body: string) {
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const options = { body, icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', tag: title };
+  // Through the service worker when there is one: Android Chrome only shows
+  // notifications that way, and a tap focuses the app.
+  const reg = await navigator.serviceWorker?.getRegistration().catch(() => undefined);
+  if (reg) {
+    try {
+      await reg.showNotification(title, options);
+      return;
+    } catch { /* fall back below */ }
+  }
   try {
-    new Notification(title, { body, icon: '/app-icon.svg' });
+    new Notification(title, options);
   } catch (e) {
-    // Android Chrome only allows notifications from a service worker.
     console.warn('[notify]', e);
   }
 }

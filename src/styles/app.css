@@ -188,7 +188,7 @@ sv-map { position: absolute; inset: 0; display: block; }
 
 .sv-sidebar-head { display: flex; align-items: center; gap: 6px; padding: 10px 10px 6px 6px; min-height: 60px; }
 .sv-loc-btn { --m3e-text-button-label-text-color: var(--md-sys-color-on-surface); flex: 0 1 auto; min-width: 0; max-width: 100%; overflow: hidden; }
-.sv-sidebar-head > :not(.sv-loc-btn) { flex: none; }
+.sv-sidebar-head > :not(.sv-loc-btn):not(.sv-spacer) { flex: none; }
 .sv-loc-name { font-weight: 700; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sv-loc-state { margin-left: 6px; color: var(--md-sys-color-on-surface-variant); }
 .sv-sidebar-body { flex: 1; padding: 4px 12px 16px; }
@@ -678,6 +678,178 @@ m3e-card.sv-detail, m3e-card.sv-preview-card { transition: border-radius 300ms v
   *, *::before, *::after { animation: none !important; transition-duration: 0s !important; }
 }
 
+/* ------------------------------------------------------------- charts */
+sv-timeseries { display: block; }
+.sv-ts { position: relative; touch-action: pan-y; user-select: none; }
+.sv-ts svg { display: block; overflow: visible; }
+.sv-ts-grid { stroke: var(--md-sys-color-outline-variant); stroke-width: 1; opacity: 0.6; }
+.sv-ts-tick { fill: var(--md-sys-color-on-surface-variant); font-size: 11px; font-family: var(--sv-font); }
+.sv-ts-cross { stroke: var(--md-sys-color-on-surface-variant); stroke-width: 1; }
+.sv-ts-dot { stroke: var(--md-sys-color-surface-container-highest); stroke-width: 2; }
+.sv-ts-tip {
+  position: absolute; top: 4px; z-index: 2; pointer-events: none; white-space: nowrap;
+  padding: 8px 10px; border-radius: 12px; background: var(--md-sys-color-inverse-surface); color: var(--md-sys-color-inverse-on-surface);
+  display: flex; flex-direction: column; gap: 2px; font-size: 12px; box-shadow: var(--sv-elev-2);
+}
+.sv-ts-tip-row { display: flex; align-items: center; gap: 6px; }
+.sv-ts-tip-row b { margin-left: auto; padding-left: 10px; }
+.sv-ts-tip i, .sv-ts-legend i { display: inline-block; width: 14px; height: 2px; border-radius: 1px; flex: none; }
+.sv-ts-tip i.dashed, .sv-ts-legend i.dashed { background-image: linear-gradient(90deg, currentColor 60%, transparent 0) !important; background-size: 6px 2px; }
+.sv-ts-tip i.bar, .sv-ts-legend i.bar { width: 8px; height: 8px; border-radius: 2px; }
+.sv-ts-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--md-sys-color-on-surface-variant); }
+.sv-ts-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sv-ts-legend i.dashed { color: var(--md-sys-color-tertiary); }
+.sv-ts-below { position: absolute; left: 0; right: 0; }
+.sv-wind-arrow { position: absolute; top: 2px; --m3e-icon-size: 18px; color: var(--md-sys-color-on-surface-variant); }
+
+/* Rain in the next hour */
+.sv-rain-head { display: flex; align-items: center; gap: 12px; }
+.sv-rain-chart { position: relative; display: flex; align-items: flex-end; gap: 6px; height: 84px; padding-top: 4px; border-bottom: 1px solid var(--md-sys-color-outline-variant); }
+.sv-rain-col {
+  flex: 1; height: 100%; display: flex; align-items: flex-end; justify-content: center; padding: 0; border: none; background: none;
+  cursor: pointer; border-radius: 6px 6px 0 0; -webkit-tap-highlight-color: transparent;
+}
+.sv-rain-col:hover, .sv-rain-col.picked { background: color-mix(in srgb, var(--md-sys-color-on-surface) 6%, transparent); }
+.sv-rain-bar { width: min(100%, 24px); border-radius: 4px 4px 0 0; transition: height 500ms var(--sv-spring); }
+.sv-rain-guide { position: absolute; left: 0; right: 0; border-top: 1px solid var(--md-sys-color-outline-variant); opacity: 0.7; pointer-events: none; }
+.sv-rain-guide span { position: absolute; right: 0; top: -15px; font-size: 10px; color: var(--md-sys-color-on-surface-variant); }
+.sv-rain-axis { display: flex; justify-content: space-between; margin-top: -6px; }
+.sv-rain-foot { min-height: 16px; }
+
+/* Historical climate */
+.sv-climate-range { position: relative; height: 14px; margin: 4px 0; }
+.sv-climate-track { position: absolute; inset: 4px 0; border-radius: 3px; background: var(--md-sys-color-surface-container-low); }
+.sv-climate-normal { position: absolute; top: 2px; bottom: 2px; border-radius: 5px; background: color-mix(in srgb, var(--md-sys-color-primary) 45%, transparent); }
+.sv-climate-today { position: absolute; top: 4px; bottom: 4px; border-radius: 3px; background: var(--md-sys-color-tertiary); box-shadow: 0 0 0 2px var(--md-sys-color-surface-container-highest); }
+.sv-climate-legend { display: flex; gap: 14px; }
+.sv-climate-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sv-climate-legend i { width: 12px; height: 8px; border-radius: 3px; }
+.sv-climate-legend i.normal { background: color-mix(in srgb, var(--md-sys-color-primary) 45%, transparent); }
+.sv-climate-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.sv-climate-stats > div { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 16px; background: var(--md-sys-color-surface-container-low); }
+.sv-climate-stats b { font-weight: 500; }
+.sv-climate-legend i.today { background: var(--md-sys-color-tertiary); }
+
+/* ---------------------------------------------------------- edit mode */
+.sv-edit-open { align-self: center; margin-top: 4px; }
+.sv-edit-intro {
+  display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 20px;
+  background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); --m3e-icon-size: 22px;
+}
+.sv-edit-intro .sv-muted { color: inherit; opacity: 0.85; }
+.sv-edit-locked { opacity: 0.55; pointer-events: none; }
+.sv-edit-list { display: flex; flex-direction: column; gap: 12px; }
+.sv-edit-item {
+  position: relative; border-radius: 28px; outline: 2px dashed var(--md-sys-color-outline-variant); outline-offset: 2px;
+  background: var(--md-sys-color-surface-container-low); transition: box-shadow 200ms, outline-color 200ms;
+}
+.sv-edit-item.dragging {
+  z-index: 5; outline-style: solid; outline-color: var(--md-sys-color-primary); box-shadow: var(--sv-elev-3);
+  background: var(--md-sys-color-surface-container-high);
+}
+.sv-edit-bar { display: flex; align-items: center; gap: 4px; padding: 6px 6px 2px 4px; }
+.sv-edit-handle {
+  display: grid; place-items: center; width: 44px; height: 40px; border: none; border-radius: 20px; background: none;
+  color: var(--md-sys-color-on-surface-variant); cursor: grab; touch-action: none; -webkit-tap-highlight-color: transparent;
+}
+.sv-edit-handle:hover { background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent); }
+.sv-edit-item.dragging .sv-edit-handle { cursor: grabbing; color: var(--md-sys-color-primary); }
+.sv-edit-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sv-edit-remove { color: var(--md-sys-color-error); }
+.sv-edit-body { padding: 0 6px 6px; pointer-events: none; max-height: 280px; overflow: hidden; }
+/* Only sections cut off by the height limit fade out (class set in sv-weather-content). */
+.sv-edit-body.clipped { -webkit-mask-image: linear-gradient(#000 78%, transparent); mask-image: linear-gradient(#000 78%, transparent); }
+.sv-edit-empty { display: flex; align-items: center; gap: 10px; padding: 14px; border-radius: 20px; background: var(--md-sys-color-surface-container); color: var(--md-sys-color-on-surface-variant); }
+/* A solid bottom bar across the panel, so sections scrolling under it never show through. */
+.sv-edit-footer {
+  /* Sticky stops at the scroll area's padding; offset by it so the bar meets the real bottom edge. */
+  display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; position: sticky; bottom: -16px; z-index: 3;
+  margin: 0 -12px -16px; padding: 12px 12px 16px;
+  background: var(--md-sys-color-surface-container-low); border-top: 1px solid var(--md-sys-color-outline-variant);
+}
+.sv-app[data-compact='true'] .sv-edit-footer { background: var(--md-sys-color-surface); bottom: -12px; margin-bottom: -12px; padding-bottom: 12px; }
+/* No assistant button while editing, so the edit footer can sit right at the bottom. */
+.sv-app[data-editing='true'] .sv-compact-home { padding-bottom: 12px; }
+
+.sv-edit-none { text-align: center; }
+/* The edit bar already names the section; and the assistant button would sit on the edit footer. */
+.sv-edit-body .sv-widget-head { display: none; }
+.sv-app[data-editing='true'] .sv-assistant { display: none; }
+.sv-loc-more { --m3e-icon-size: 18px; opacity: 0.7; }
+
+/* --------------------------------------------------------- modal sheets */
+.sv-modal-scrim { position: fixed; inset: 0; z-index: 40; background: var(--md-sys-color-scrim, #000); opacity: 0; pointer-events: none; transition: opacity 280ms var(--sv-emphasized); }
+.sv-modal-scrim.open { opacity: 0.4; pointer-events: auto; }
+.sv-modal {
+  position: fixed; z-index: 41; left: 50%; top: 50%; width: min(620px, calc(100vw - 32px)); max-height: min(760px, calc(100dvh - 48px));
+  display: flex; flex-direction: column; border-radius: 28px; background: var(--md-sys-color-surface-container-low); box-shadow: var(--sv-elev-3);
+  transform: translate(-50%, -46%) scale(0.96); opacity: 0; visibility: hidden;
+  transition: transform 420ms var(--sv-spring), opacity 200ms, visibility 0s 420ms;
+}
+.sv-modal.open { transform: translate(-50%, -50%); opacity: 1; visibility: visible; transition: transform 420ms var(--sv-spring), opacity 200ms, visibility 0s; }
+.sv-modal--places { width: min(460px, calc(100vw - 32px)); }
+.sv-modal-grip { display: none; }
+.sv-modal-head { display: flex; align-items: center; gap: 10px; padding: 16px 12px 8px 20px; --m3e-icon-size: 24px; }
+.sv-modal-head > m3e-icon { color: var(--md-sys-color-primary); }
+.sv-modal-body { flex: 1; padding: 4px 16px 20px; display: flex; flex-direction: column; gap: 12px; }
+
+/* Add widgets */
+.sv-add-search { flex: none; }
+.sv-add-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.sv-add-card {
+  display: flex; flex-direction: column; gap: 10px; padding: 10px; border: none; border-radius: 24px; text-align: left; font: inherit;
+  background: var(--md-sys-color-surface-container-high); color: var(--md-sys-color-on-surface); cursor: pointer; position: relative;
+  transition: border-radius 300ms var(--sv-spring), background 200ms;
+}
+.sv-add-card:hover { background: var(--md-sys-color-surface-container-highest); }
+:root:not([data-press='ripple']) .sv-add-card:active { border-radius: 34px; }
+.sv-add-preview {
+  height: 150px; border-radius: 18px; overflow: hidden; position: relative; display: grid; place-items: center;
+  background: var(--md-sys-color-surface-container-low);
+}
+.sv-add-preview-inner { position: absolute; top: 0; left: 0; width: 166.7%; transform: scale(0.6); transform-origin: top left; pointer-events: none; }
+.sv-add-icon { --m3e-shape-size: 72px; --m3e-shape-container-color: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); --m3e-icon-size: 34px; }
+.sv-add-text { padding: 0 6px 4px; display: flex; flex-direction: column; gap: 2px; padding-right: 44px; }
+.sv-add-plus {
+  position: absolute; right: 14px; bottom: 14px; width: 36px; height: 36px; border-radius: 18px; display: grid; place-items: center;
+  background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); --m3e-icon-size: 22px;
+}
+
+/* Places */
+.sv-place-current {
+  display: flex; align-items: center; gap: 14px; padding: 12px 8px 12px 14px; border-radius: 24px;
+  background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container);
+}
+.sv-place-current m3e-shape { display: grid; place-items: center; --m3e-shape-size: 44px; --m3e-shape-container-color: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); }
+.sv-place-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.sv-place-actions m3e-button { flex: 1; }
+.sv-place-list { display: flex; flex-direction: column; gap: 4px; }
+.sv-place-row { display: flex; align-items: center; gap: 4px; padding-right: 4px; border-radius: 20px; background: var(--md-sys-color-surface-container); }
+.sv-place-row.active { background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); }
+.sv-place-pick {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: none; border-radius: 20px; background: none;
+  color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.sv-place-empty { padding: 4px; }
+
+@media (max-width: 760px) {
+  /* Phones: sheets come up from the bottom, above the nav bar. */
+  .sv-modal {
+    left: 0; right: 0; top: auto; bottom: 0; width: 100%; max-height: calc(100dvh - 48px - var(--sv-safe-top));
+    border-radius: 28px 28px 0 0; padding-bottom: env(safe-area-inset-bottom, 0px);
+    transform: translateY(105%); opacity: 1;
+  }
+  .sv-modal.open { transform: none; }
+  .sv-modal--places { width: 100%; }
+  .sv-modal-grip { display: block; width: 32px; height: 4px; border-radius: 2px; margin: 10px auto 0; background: var(--md-sys-color-on-surface-variant); opacity: 0.4; }
+  .sv-modal-head { padding-top: 6px; }
+  .sv-add-grid { grid-template-columns: 1fr; }
+  .sv-add-preview { height: 130px; }
+}
+@media (max-width: 360px) {
+  .sv-provider { display: none; }
+}
+
 /* ------------------------------------------- phones, Display Zoom, big text
    Display Zoom (iOS) and larger display-size settings (Android) make a phone
    report a narrower screen — a zoomed iPhone 13 is 320px wide — so everything
@@ -685,6 +857,7 @@ m3e-card.sv-detail, m3e-card.sv-preview-card { transition: border-radius 300ms v
 @media (max-width: 760px) {
   /* Room under the last section so the assistant button never covers it. */
   .sv-compact-home { padding-bottom: 88px; }
+  .sv-app[data-editing='true'] .sv-compact-home { padding-bottom: 12px; }
   /* The hero follows its content; the scene fills whatever height that is. */
   .sv-hero--scene { min-height: 176px; padding: 12px 16px 16px; }
   .sv-hero-number { font-size: 84px; }

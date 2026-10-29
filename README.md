@@ -23,6 +23,21 @@ npm run build     # static site in dist/ — host it anywhere
 
 The site is installable. `public/icons/` holds opaque PNG icons, which iOS needs because it ignores SVG and transparency: `apple-touch-icon.png` (180 px) for iOS, plus regular and maskable icons for Android/Chrome. To regenerate them from `public/app-icon.svg`, render it with `rsvg-convert` and composite it onto a `#d7e2ff` square.
 
+## Features at a glance
+
+- **Home screen editing:** tap the pencil in the header, or *Edit home screen* at the bottom of the list. Drag sections by their handle, remove them, and use **Add widgets** to open a picker with live previews.
+- **Saved places:** tap the location name to open *Places*. Star the current place to save it, then switch between saved places with one tap. The forecasts for the last six places are cached, so switching is instant.
+- **New widgets:**
+  - *Rain in the Next Hour*: Open-Meteo's 15-minute precipitation, with a plain-language headline.
+  - *Temperature Graph*: 24 hours of temperature and feels-like, with rain chance shown as a separate strip.
+  - *Wind & Gusts*: speed, gusts and direction for 24 hours.
+  - *Historical Climate*: normals and records since 1991 from Open-Meteo's ERA5 archive. It's about 360 KB, fetched once a month per place, and only the condensed table is stored.
+- **Lightning:** live strikes from the last 15 minutes, from the Blitzortung.org community network (toolbar ⚡ or Settings → Radar). The connection is only open while the layer is on and the tab is visible.
+- **Seasonal scenes:** petals in spring, light motes and fireflies in summer, falling leaves in fall, and icicles with frost sparkle in winter. Winter never uses falling snow, so it doesn't look like it's snowing. Set it under Settings → Display → Weather scene; Automatic follows the date and your hemisphere.
+- **Haptics:** a light tick on presses, a firmer one for toggles, double pulses for confirmations, and ticks while dragging or scrubbing. Android uses the Vibration API; iOS 18+ uses the system switch haptic. Turn it off in Settings → Display → Touch.
+- **Offline:** `public/sw.js` caches the app, and the last forecast is kept locally, so the installed app opens with no connection and says how old the data is. The service worker also delivers notifications on Android.
+- **Rain starting soon:** with notifications on, you get one heads-up per rain event when rain or snow is due within 45 minutes.
+
 ## Data
 
 Open-Meteo (forecast, air quality, seasonal), the NWS (forecast, alerts, warning polygons), Nominatim (search), ipwho.is / ipapi.co (approximate location), and LibreWXR (radar). They all allow cross-origin requests, so the site needs no server. All of these calls live in `src/lib/providers.ts`.
