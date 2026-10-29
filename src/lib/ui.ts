@@ -36,6 +36,28 @@ export async function copyText(text: string) {
  */
 export const stateDriven = (e: Event) => e.preventDefault();
 
+/**
+ * Scrolls `el` into view inside its nearest scrolling ancestor only.
+ * `Element.scrollIntoView()` also scrolls every outer container, including
+ * `overflow: hidden` ones like the sidebar panel, which shoves the whole panel
+ * up and leaves empty space below it.
+ */
+export function scrollWithin(el: Element, block: 'center' | 'nearest' = 'center') {
+  let p: Element | null = el.parentElement ?? (el.getRootNode() as ShadowRoot).host ?? null;
+  while (p) {
+    const oy = getComputedStyle(p).overflowY;
+    if ((oy === 'auto' || oy === 'scroll') && p.scrollHeight > p.clientHeight) break;
+    p = p.parentElement ?? ((p.getRootNode() as ShadowRoot).host as Element | undefined) ?? null;
+  }
+  if (!p) return;
+  const r = el.getBoundingClientRect(), pr = p.getBoundingClientRect();
+  let dy = 0;
+  if (block === 'center') dy = r.top - pr.top - (pr.height - r.height) / 2;
+  else if (r.top < pr.top) dy = r.top - pr.top - 8;
+  else if (r.bottom > pr.bottom) dy = r.bottom - pr.bottom + 8;
+  if (dy) p.scrollBy({ top: dy, behavior: 'smooth' });
+}
+
 /** Reads `.value` / `.checked` from M3E form controls in event handlers. */
 export const valueOf = (e: Event) => (e.target as unknown as { value: string }).value;
 export const checkedOf = (e: Event) => (e.target as unknown as { checked: boolean }).checked;

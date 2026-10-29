@@ -6,7 +6,7 @@ import { locateMe, setLocation } from '../lib/data';
 import { semantic, SEVERITY_HUE } from '../lib/format';
 import { $, store, StoreController } from '../lib/store';
 import type { Alert } from '../lib/types';
-import { openExternal, SvElement } from '../lib/ui';
+import { openExternal, scrollWithin, SvElement } from '../lib/ui';
 
 export const WHATS_NEW_VERSION = 'web-1.0.0';
 
@@ -160,7 +160,8 @@ export class SvDialogs extends SvElement {
   private async toggleIosHelp() {
     this.iosHelp = !this.iosHelp;
     await this.updateComplete;
-    if (this.iosHelp) this.querySelector('.sv-ios-steps')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    const steps = this.querySelector('.sv-ios-steps');
+    if (this.iosHelp && steps) scrollWithin(steps, 'nearest');
   }
 
   private downloadRow(d: (typeof DOWNLOADS)[number], i: number) {

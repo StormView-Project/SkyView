@@ -265,6 +265,10 @@ export class SvMap extends SvElement {
     });
     this.map.on('sourcedata', () => this.reportRadarProgress());
     this.map.on('idle', () => this.reportRadarProgress());
+    // The location pin is a DOM marker; make sure it's still there whenever the
+    // map settles or recovers its WebGL context.
+    this.map.on('idle', () => this.ensureMarker());
+    this.map.on('webglcontextrestored', () => this.ensureMarker());
     this.map.on('contextmenu', (e) => this.openContextMenu(e.originalEvent.clientX, e.originalEvent.clientY, e.lngLat));
     this.watchLongPress();
     this.map.on('click', (e) => this.onClick(e));
@@ -328,13 +332,19 @@ export class SvMap extends SvElement {
     const layers = this.map.getStyle().layers;
     const firstSymbol = layers.find((l) => l.type === 'symbol')?.id;
     const firstBoundary = layers.find((l) => l.id.startsWith('boundary'))?.id ?? firstSymbol;
-    const anchor = (id: string, before?: string) =>
-      this.map.addLayer({ id, type: 'background', layout: { visibility: 'none' }, paint: {} }, before);
+    // After a WebGL context loss or a worker restart, MapLibre re-applies a snapshot
+    // of the style that already contains these, so only add what's missing.
+    const anchor = (id: string, before?: string) => {
+      if (!this.map.getLayer(id)) this.map.addLayer({ id, type: 'background', layout: { visibility: 'none' }, paint: {} }, before);
+    };
     anchor(ANCHOR_SAT, firstBoundary);
     anchor(ANCHOR_RADAR, firstBoundary);
     anchor(ANCHOR_ALERTS, firstSymbol);
     this.styleReady = true;
     this.radarKeys.clear();
+    // Adopt radar layers carried over in a restored snapshot, so they're still
+    // faded and removed as frames advance instead of getting stuck on the map.
+    for (const l of this.map.getStyle().layers) if (l.id.startsWith('radar-')) this.radarKeys.set(l.id, '');
     if (this.styleKind === 'material') this.recolorBase();
     this.updateSatellite();
     this.updateLightning();
@@ -355,6 +365,19 @@ export class SvMap extends SvElement {
   }
 
   /* ----------------------------------------------------------- location */
+
+  /** Recreates the location pin if it went missing or detached from this map. */
+  private ensureMarker() {
+    if (!this.styleReady || !$().location) return;
+    const el = this.marker?.getElement();
+    const ok = !!el && el.isConnected && this.map.getContainer().contains(el) && getComputedStyle(el).display !== 'none';
+    if (!ok) {
+      console.warn('[map] location marker was missing; recreating it');
+      this.updateLocation(false);
+    } else if (el.style.opacity && Number(el.style.opacity) < 1 && !this.map.terrain) {
+      el.style.opacity = '';
+    }
+  }
 
   private updateLocation(fly: boolean) {
     const loc = $().location;
@@ -422,7 +445,7 @@ export class SvMap extends SvElement {
       features: strikes.map((st) => ({
         type: 'Feature',
         geometry: { type: 'Point', coordinates: [st.lon, st.lat] },
-        properties: { age: Math.min(KEEP_MS, now - st.time) / 60_000 },
+        properties: { age: Math.min(KEEP_MS, now - st.time) / 60_000, time: st.time },
       })),
     });
   }
@@ -776,7 +799,85 @@ export class SvMap extends SvElement {
     this.alertTimer = window.setInterval(load, ALERT_REFRESH);
   }
 
+  /** Lightning dots are tiny, so look in a small box around the pointer and take the nearest. */
+  private strikesNear(point: maplibregl.Point, touch: boolean) {
+    if (!this.map.getLayer('sv-lightning')) return [];
+    const r = touch ? 14 : 8;
+    const feats = this.map.queryRenderedFeatures([[point.x - r, point.y - r], [point.x + r, point.y + r]], { layers: ['sv-lightning'] });
+    const dist = (f: maplibregl.MapGeoJSONFeature) => {
+      const [lon, lat] = (f.geometry as GeoJSON.Point).coordinates;
+      const p = this.map.project([lon, lat]);
+      return Math.hypot(p.x - point.x, p.y - point.y);
+    };
+    // Nearest first; among equally near, the most recent.
+    return feats.sort((a, b) => dist(a) - dist(b) || Number(b.properties.time) - Number(a.properties.time));
+  }
+
+  private strikePopup: maplibregl.Popup | null = null;
+
+  private showStrike(feats: maplibregl.MapGeoJSONFeature[]) {
+    const f = feats[0];
+    const [lon, lat] = (f.geometry as GeoJSON.Point).coordinates;
+    const time = Number(f.properties.time);
+    const metric = $().units === 'metric';
+    const loc = $().location;
+    const esc = (t: string) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+    // Distance and direction from the weather location to the strike.
+    let where = '';
+    if (loc) {
+      const R = 6371, rad = Math.PI / 180;
+      const dLat = (lat - loc.lat) * rad, dLon = (lon - loc.lon) * rad;
+      const a = Math.sin(dLat / 2) ** 2 + Math.cos(loc.lat * rad) * Math.cos(lat * rad) * Math.sin(dLon / 2) ** 2;
+      const km = 2 * R * Math.asin(Math.sqrt(a));
+      const y = Math.sin(dLon) * Math.cos(lat * rad);
+      const x = Math.cos(loc.lat * rad) * Math.sin(lat * rad) - Math.sin(loc.lat * rad) * Math.cos(lat * rad) * Math.cos(dLon);
+      const bearing = (Math.atan2(y, x) / rad + 360) % 360;
+      const dirs = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+      const d = metric ? km : km / 1.609;
+      const amount = d < 10 ? d.toFixed(1) : Math.round(d).toString();
+      where = d < 0.5 ? `Right at ${esc(loc.name)}` : `${amount} ${metric ? 'km' : 'mi'} ${dirs[Math.round(bearing / 22.5) % 16]} of ${esc(loc.name)}`;
+    }
+    const ago = () => {
+      const s = Math.max(0, Math.round((Date.now() - time) / 1000));
+      return s < 60 ? `${s} s ago` : `${Math.floor(s / 60)} min ${s % 60} s ago`;
+    };
+    const coord = `${Math.abs(lat).toFixed(4)}° ${lat >= 0 ? 'N' : 'S'}, ${Math.abs(lon).toFixed(4)}° ${lon >= 0 ? 'E' : 'W'}`;
+    const more = feats.length - 1;
+    this.strikePopup?.remove();
+    const popup = new maplibregl.Popup({ className: 'sv-popup', maxWidth: '300px' })
+      .setLngLat([lon, lat])
+      .setHTML(`
+        <div class="sv-popup-body sv-strike-popup">
+          <div class="sv-strike-head">
+            <span class="sv-strike-icon"><m3e-icon name="bolt" filled></m3e-icon></span>
+            <div><div class="sv-strike-title">Lightning strike</div><div class="sv-strike-ago">${ago()}</div></div>
+          </div>
+          <div class="sv-strike-grid">
+            <span>Time</span><b>${new Date(time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' })}</b>
+            ${where ? `<span>Distance</span><b>${where}</b>` : ''}
+            <span>Location</span><b>${coord}</b>
+          </div>
+          ${more ? `<small>${more} more strike${more > 1 ? 's' : ''} right around here in the last 15 minutes</small>` : ''}
+          <small>Detected by the Blitzortung.org sensor network</small>
+        </div>`)
+      .addTo(this.map);
+    this.strikePopup = popup;
+    // "2 min 14 s ago" keeps counting while the popup is open.
+    const timer = window.setInterval(() => {
+      const el = popup.getElement()?.querySelector('.sv-strike-ago');
+      if (el) el.textContent = ago();
+    }, 1000);
+    popup.on('close', () => {
+      clearInterval(timer);
+      if (this.strikePopup === popup) this.strikePopup = null;
+    });
+  }
+
   private onHover(e: MapMouseEvent) {
+    if (this.strikesNear(e.point, false).length) {
+      this.map.getCanvas().style.cursor = 'pointer';
+      return;
+    }
     const layers = ['sv-warn-fill', 'sv-adv-fill'].filter((l) => this.map.getLayer(l));
     const f = layers.length ? this.map.queryRenderedFeatures(e.point, { layers })[0] : undefined;
     if (this.hovered && (!f || f.id !== this.hovered.id || f.source !== this.hovered.source)) {
@@ -791,6 +892,13 @@ export class SvMap extends SvElement {
   }
 
   private onClick(e: MapMouseEvent) {
+    // Strikes sit above alert polygons, so they win.
+    const touch = (e.originalEvent as PointerEvent).pointerType === 'touch' || matchMedia('(pointer: coarse)').matches;
+    const strikes = this.strikesNear(e.point, touch);
+    if (strikes.length) {
+      this.showStrike(strikes);
+      return;
+    }
     const layers = ['sv-warn-fill', 'sv-adv-fill'].filter((l) => this.map.getLayer(l));
     const feats = layers.length ? this.map.queryRenderedFeatures(e.point, { layers }) : [];
     if (feats.length) {

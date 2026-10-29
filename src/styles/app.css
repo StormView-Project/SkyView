@@ -174,6 +174,17 @@ sv-map { position: absolute; inset: 0; display: block; }
 .sv-aqi-popup-grid { display: grid; grid-template-columns: auto 1fr auto 1fr; gap: 4px 10px; }
 .sv-aqi-popup-grid span { color: var(--md-sys-color-on-surface-variant); }
 .sv-popup-body small { color: var(--md-sys-color-on-surface-variant); }
+.sv-strike-head { display: flex; align-items: center; gap: 10px; }
+.sv-strike-icon {
+  display: grid; place-items: center; width: 40px; height: 40px; border-radius: 14px; flex: none; --m3e-icon-size: 24px;
+  background: color-mix(in srgb, #ffb000 28%, var(--md-sys-color-surface-container-highest)); color: #ffcf4d;
+}
+:root[data-theme='light'] .sv-strike-icon { color: #9a5b00; }
+.sv-strike-title { font-size: 16px; font-weight: 600; }
+.sv-strike-ago { color: var(--md-sys-color-on-surface-variant); font-variant-numeric: tabular-nums; }
+.sv-strike-grid { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; }
+.sv-strike-grid span { color: var(--md-sys-color-on-surface-variant); }
+.sv-strike-grid b { font-weight: 500; }
 
 /* --------------------------------------------------------------- sidebar */
 .sv-sidebar {

@@ -5,7 +5,7 @@ import { isSaved, locateMe, removeSavedLocation, saveLocation, setLocation } fro
 import { haptic } from '../lib/haptics';
 import { $, store, StoreController, WIDGET_INFO, WIDGET_LABELS, type WidgetId } from '../lib/store';
 import type { Place } from '../lib/types';
-import { SvElement, toast } from '../lib/ui';
+import { scrollWithin, SvElement, toast } from '../lib/ui';
 import { renderWidget } from './sv-sidebar';
 
 /** Widgets whose preview would start a network request; they get an icon tile instead. */
@@ -54,7 +54,7 @@ export class SvAddWidgets extends SvElement {
     // Bring the new section into view and flash it, like Android does after a drop.
     requestAnimationFrame(() => requestAnimationFrame(() => {
       const el = document.querySelector<HTMLElement>(`.sv-edit-item[data-id="${id}"], .sv-widget-slot[data-id="${id}"]`);
-      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if (el) scrollWithin(el);
       el?.animate(
         [{ boxShadow: '0 0 0 0 var(--md-sys-color-primary)' }, { boxShadow: '0 0 0 4px var(--md-sys-color-primary)' }, { boxShadow: '0 0 0 0 var(--md-sys-color-primary)' }],
         { duration: 1400, easing: 'ease-in-out' },
