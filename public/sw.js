@@ -4,13 +4,18 @@
  *
  *  - page loads:            network first, cached copy when offline
  *  - /assets/* (hashed):    cache first; they never change, old ones are pruned
- *  - other same-origin GETs (icons, manifest, wasm): stale-while-revalidate
+ *  - icons, manifest, app icon:  stale-while-revalidate
+ *  - everything else:            straight to the network (never cached), so
+ *    unhashed code — including the Vite dev server's /src files — can't go stale
  *  - other sites (weather APIs, map tiles): untouched — the app keeps its own
  *    last-known forecast in localStorage
  */
-const CACHE = 'skyview-v1';
+const CACHE = 'skyview-v2';
 const ASSET_LIMIT = 120;
 const SHELL = ['./', './manifest.webmanifest', './icons/icon-192.png', './icons/apple-touch-icon.png'];
+/** The build's hashed files live directly under <scope>/assets/ (not e.g. the dev server's /src/assets/). */
+const ASSETS = new URL('./assets/', self.registration.scope).pathname;
+const isBuildAsset = (pathname) => pathname.startsWith(ASSETS);
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).catch(() => {}));
@@ -25,7 +30,7 @@ self.addEventListener('activate', (e) => {
 });
 
 async function prune(cache) {
-  const keys = (await cache.keys()).filter((r) => new URL(r.url).pathname.includes('/assets/'));
+  const keys = (await cache.keys()).filter((r) => isBuildAsset(new URL(r.url).pathname));
   for (const r of keys.slice(0, Math.max(0, keys.length - ASSET_LIMIT))) await cache.delete(r);
 }
 
@@ -49,7 +54,7 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  if (url.pathname.includes('/assets/')) {
+  if (isBuildAsset(url.pathname)) {
     e.respondWith((async () => {
       const hit = await caches.match(req);
       if (hit) return hit;
@@ -64,6 +69,8 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
+  // Only small static app files that change rarely; anything else isn't touched.
+  if (!/\/(icons\/[^/]+\.png|manifest\.webmanifest|app-icon\.svg|apple-touch-icon[^/]*\.png)$/.test(url.pathname)) return;
   e.respondWith((async () => {
     const cache = await caches.open(CACHE);
     const hit = await cache.match(req);

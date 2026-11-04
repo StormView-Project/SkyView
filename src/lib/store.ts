@@ -110,7 +110,8 @@ export interface Settings {
   haptics: boolean;             // vibration feedback on presses (Android) / system haptics (iOS 18+)
   // Layout
   sidebarPosition: 'left' | 'right';
-  compactLayout: boolean;       // the phone layout (bottom navigation bar), used for narrow windows
+  layoutMode: 'auto' | 'desktop' | 'mobile'; // auto: phone layout (bottom nav bar) in narrow windows, desktop (map + sidebar) otherwise
+  sidebarCollapsed: boolean;    // desktop layout: sidebar tucked away for a full-width radar
   // Widgets
   widgets: { id: WidgetId; enabled: boolean }[];
   detailsFields: Record<DetailsField, boolean>;
@@ -162,7 +163,8 @@ export const DEFAULT_SETTINGS: Settings = {
   sceneSeason: 'auto',
   haptics: true,
   sidebarPosition: 'left',
-  compactLayout: true,
+  layoutMode: 'auto',
+  sidebarCollapsed: false,
   widgets: DEFAULT_WIDGETS,
   detailsFields: {
     humidity: true, wind: true, visibility: true, pressure: true, dewPoint: true,
@@ -323,6 +325,9 @@ class Store {
       merged.widgets = [...valid, ...DEFAULT_WIDGETS.filter((d) => !ids.has(d.id)).map((d) => ({ ...d, enabled: false }))];
     }
     merged.detailsFields = { ...DEFAULT_SETTINGS.detailsFields, ...(saved.detailsFields ?? {}) };
+    // The old on/off "Phone layout" switch: off meant always use the desktop layout.
+    const legacy = saved as Partial<Settings> & { compactLayout?: boolean };
+    if (!legacy.layoutMode && legacy.compactLayout === false) merged.layoutMode = 'desktop';
     this.set({ ...merged, ready: true });
   }
 
@@ -369,6 +374,11 @@ export class StoreController<T extends readonly unknown[]> implements ReactiveCo
   hostDisconnected() {
     this.unsub?.();
   }
+}
+
+/** Whether the phone layout (scrollable home + bottom nav bar) is in use. */
+export function isCompact(s: Pick<State, 'layoutMode' | 'isNarrow'>) {
+  return s.layoutMode === 'mobile' || (s.layoutMode === 'auto' && s.isNarrow);
 }
 
 /** Convenience: current state snapshot. */

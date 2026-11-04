@@ -6,7 +6,7 @@ import { locateMe, setLocation } from '../lib/data';
 import { radarWasmSupported } from '../radar-wasm/radarRenderer';
 import { COLOR_PRESETS, previewSwatch, VARIANTS } from '../lib/theme';
 import {
-  $, DETAILS_FIELD_LABELS, SETTINGS_KEYS, store, StoreController, WIDGET_LABELS, type DetailsField, type Settings, type SettingsTab,
+  $, DETAILS_FIELD_LABELS, isCompact, SETTINGS_KEYS, store, StoreController, WIDGET_LABELS, type DetailsField, type Settings, type SettingsTab,
 } from '../lib/store';
 import type { Place } from '../lib/types';
 import { checkedOf, openExternal, SvElement, toast, valueOf } from '../lib/ui';
@@ -306,8 +306,16 @@ export class SvSettings extends SvElement {
       ${group('Map', row('Base map', segmented([{ label: 'Material', value: 'material', icon: 'palette' }, { label: 'Streets', value: 'streets', icon: 'map' }], s.mapStyle, (v) => set({ mapStyle: v })), 'Material repaints the map with your color scheme.', true))}
 
       ${group('Layout', [
-        s.isNarrow && s.compactLayout ? nothing : row('Sidebar position', segmented([{ label: 'Left', value: 'left' }, { label: 'Right', value: 'right' }], s.sidebarPosition, (v) => set({ sidebarPosition: v })), undefined, true),
-        toggle('Phone layout', s.compactLayout, (v) => set({ compactLayout: v }), 'On phones and narrow windows, use a scrollable weather page with a navigation bar instead of the map + sidebar.'),
+        row('Layout', segmented([
+          { label: 'Auto', value: 'auto', icon: 'devices' },
+          { label: 'Desktop', value: 'desktop', icon: 'desktop_windows' },
+          { label: 'Mobile', value: 'mobile', icon: 'smartphone' },
+        ], s.layoutMode, (v) => set({ layoutMode: v })),
+          s.layoutMode === 'auto' ? 'Mobile layout in narrow windows and on phones, desktop layout (map + sidebar) otherwise.'
+            : s.layoutMode === 'desktop' ? 'Always the full map with the weather sidebar, even on a phone.'
+              : 'Always the scrollable weather page with a bottom navigation bar, even on a big screen.', true),
+        isCompact(s) ? nothing : row('Sidebar position', segmented([{ label: 'Left', value: 'left' }, { label: 'Right', value: 'right' }], s.sidebarPosition, (v) => set({ sidebarPosition: v })), undefined, true),
+        isCompact(s) ? nothing : toggle('Hide sidebar', s.sidebarCollapsed, (v) => set({ sidebarCollapsed: v }), 'Tuck the sidebar away for a full-width radar. You can also use the button in its header, or press [.'),
       ])}
 
       ${group('Weather scene', [

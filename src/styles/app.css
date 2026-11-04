@@ -126,7 +126,10 @@ sv-map { position: absolute; inset: 0; display: block; }
 .sv-bottom-dock {
   position: absolute; bottom: var(--sv-gap); z-index: 9; display: flex; justify-content: center; pointer-events: none;
   left: calc(var(--sv-sidebar-w) + var(--sv-gap) * 2); right: 96px;
+  transition: left 420ms var(--sv-emphasized), right 420ms var(--sv-emphasized);
 }
+/* Sidebar hidden: the scrubber moves to the middle of the screen. */
+.sv-app[data-collapsed='true'] .sv-bottom-dock, .sv-app[data-collapsed='true'][data-side='right'] .sv-bottom-dock { left: 96px; right: 96px; }
 .sv-app[data-side='right'] .sv-bottom-dock { left: 96px; right: calc(var(--sv-sidebar-w) + var(--sv-gap) * 2); }
 .sv-bottom-dock > * { pointer-events: auto; width: min(680px, 100%); }
 
@@ -191,8 +194,28 @@ sv-map { position: absolute; inset: 0; display: block; }
   position: absolute; top: var(--sv-gap); bottom: var(--sv-gap); left: var(--sv-gap); z-index: 10;
   width: var(--sv-sidebar-w); display: flex; flex-direction: column; overflow: hidden;
   background: var(--md-sys-color-surface-container-low);
-  animation: sv-slide-in-left 600ms var(--sv-spring) both;
+  /* backwards, not both: a held final keyframe would pin transform and block the collapse transition */
+  animation: sv-slide-in-left 600ms var(--sv-spring) backwards;
+  transition: transform 460ms var(--sv-spring), opacity 260ms var(--sv-emphasized);
 }
+.sv-app[data-collapsed='true'] .sv-sidebar { transform: translateX(calc(-100% - var(--sv-gap) * 2)); opacity: 0; pointer-events: none; }
+.sv-app[data-collapsed='true'] .sv-sidebar[data-side='right'] { transform: translateX(calc(100% + var(--sv-gap) * 2)); }
+
+/* Collapsed sidebar: a pill with the current conditions that brings it back. */
+.sv-sidebar-pill {
+  position: absolute; top: var(--sv-gap); left: var(--sv-gap); z-index: 10; display: flex; align-items: center; gap: 12px;
+  padding: 8px 12px 8px 16px; min-height: 56px; border: none; border-radius: 28px; font: inherit; text-align: left; cursor: pointer;
+  background: var(--md-sys-color-surface-container-high); color: var(--md-sys-color-on-surface);
+  animation: sv-pop 420ms var(--sv-spring) both; transition: border-radius 300ms var(--sv-spring);
+}
+/* .sv-press (ripple) sets position: relative later on; the pill must stay pinned to its corner. */
+.sv-sidebar-pill.sv-press { position: absolute; }
+.sv-app[data-side='right'] .sv-sidebar-pill { left: auto; right: var(--sv-gap); }
+:root:not([data-press='ripple']) .sv-sidebar-pill:active { border-radius: 18px; }
+.sv-pill-temp { font-size: 28px; line-height: 32px; font-variation-settings: 'wght' 400, 'ROND' 100; }
+.sv-pill-text { display: flex; flex-direction: column; max-width: 180px; }
+.sv-pill-text > * { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sv-sidebar-pill m3e-icon { color: var(--md-sys-color-primary); }
 .sv-sidebar[data-side='right'] { left: auto; right: var(--sv-gap); animation-name: sv-slide-in-right; }
 @keyframes sv-slide-in-left { from { transform: translateX(-40px); opacity: 0; } }
 @keyframes sv-slide-in-right { from { transform: translateX(40px); opacity: 0; } }
@@ -910,4 +933,18 @@ sv-timeseries { display: block; }
   /* Assistant header on one line. */
   .sv-chat-title .sv-title-medium { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .sv-chat-head { gap: 8px; padding-left: 12px; }
+}
+
+/* -------------------------------------------- forced layouts (Settings → Display → Layout) */
+/* Mobile layout on a big screen uses the full window width, like it would on a phone. */
+/* Desktop layout on a phone: the sidebar fills the screen; hide it to see the map. */
+@media (max-width: 760px) {
+  .sv-app[data-compact='false'] { --sv-sidebar-w: calc(100vw - var(--sv-gap) * 2); }
+  .sv-app[data-compact='false'][data-collapsed='false'] .sv-top-corner,
+  .sv-app[data-compact='false'][data-collapsed='false'] .sv-bottom-dock { display: none; }
+  .sv-app[data-compact='false'][data-collapsed='true'] .sv-bottom-dock { left: var(--sv-gap); right: var(--sv-gap); }
+  .sv-app[data-compact='false'] .sv-sidebar-pill { top: 84px; }
+  .sv-app[data-compact='false'] .sv-pill-text { display: none; }
+  /* Keep the assistant button above the scrubber, like on the phone layout's radar tab. */
+  .sv-app[data-compact='false'][data-collapsed='true'] .sv-assistant { bottom: calc(var(--sv-gap) + var(--sv-radar-dock-h, 172px) + 16px); }
 }

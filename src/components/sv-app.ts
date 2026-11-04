@@ -1,7 +1,7 @@
 import { html, nothing } from 'lit';
 import { customElement } from 'lit/decorators.js';
 import { AQI_SCALE, harmonize } from '../lib/format';
-import { store, StoreController } from '../lib/store';
+import { isCompact, store, StoreController } from '../lib/store';
 import { stateDriven, SvElement } from '../lib/ui';
 import './sv-map';
 import './sv-scrubber';
@@ -19,14 +19,14 @@ const typing = (e: KeyboardEvent) => !!(e.target as HTMLElement).closest?.('inpu
 @customElement('sv-app')
 export class SvApp extends SvElement {
   private s = new StoreController(this, (s) =>
-    [s.ready, s.isNarrow, s.compactLayout, s.compactTab, s.mapLayer, s.settingsOpen, s.sidebarPosition, s.showSatellite,
-      s.tokens, s.showLightning, s.editingWidgets] as const);
+    [s.ready, s.isNarrow, s.layoutMode, s.compactTab, s.mapLayer, s.settingsOpen, s.sidebarPosition, s.showSatellite,
+      s.tokens, s.showLightning, s.editingWidgets, s.sidebarCollapsed, s.weather, s.location] as const);
   /** Tracks the radar tab's bottom dock (scrubber or AQI legend) so the assistant button sits just above it. */
   private dock?: Element;
   private dockRo = new ResizeObserver(([e]) => this.style.setProperty('--sv-radar-dock-h', `${e.borderBoxSize[0].blockSize}px`));
 
   updated() {
-    const dock = this.querySelector('.sv-compact-radar > :last-child') ?? undefined;
+    const dock = this.querySelector('.sv-compact-radar > :last-child, .sv-bottom-dock > *') ?? undefined;
     if (dock === this.dock) return;
     if (this.dock) this.dockRo.unobserve(this.dock);
     this.dock = dock;
@@ -66,6 +66,8 @@ export class SvApp extends SvElement {
         return;
       } else if (e.key === '+' || e.key === '=' || e.key === '-') {
         window.dispatchEvent(new CustomEvent('sv-zoom', { detail: e.key === '-' ? -1 : 1 }));
+      } else if (e.key === '[' && !isCompact(st)) {
+        store.set({ sidebarCollapsed: !st.sidebarCollapsed });
       } else if (e.key === ' ' && (e.target === document.body || (e.target as HTMLElement).tagName === 'SV-APP')) {
         e.preventDefault();
         store.set({ radarPlaying: !st.radarPlaying });
@@ -133,6 +135,22 @@ export class SvApp extends SvElement {
     </nav>`;
   }
 
+  /** Desktop, sidebar tucked away: current conditions at a glance, and the way back. */
+  private collapsedPill() {
+    const weather = this.s.value[12];
+    const location = this.s.value[13];
+    const cu = weather?.current;
+    return html`<button class="sv-sidebar-pill sv-surface-float sv-press" aria-label="Show sidebar" title="Show sidebar ( [ )"
+      @click=${() => store.set({ sidebarCollapsed: false })}>
+      ${cu ? html`<span class="sv-pill-temp">${cu.temp ?? '—'}°</span>` : nothing}
+      <span class="sv-pill-text">
+        <span class="sv-title-small">${location?.name ?? 'Weather'}</span>
+        ${cu ? html`<span class="sv-label-small sv-muted">${cu.condition}</span>` : nothing}
+      </span>
+      <m3e-icon name=${this.s.value[6] === 'right' ? 'right_panel_open' : 'left_panel_open'}></m3e-icon>
+    </button>`;
+  }
+
   private aqiLegend() {
     return html`<div class="sv-aqi-legend sv-surface-float">
       <div class="sv-title-small">US Air Quality Index</div>
@@ -143,10 +161,12 @@ export class SvApp extends SvElement {
   }
 
   render() {
-    const [ready, narrow, compactPref, compactTab, layer, settingsOpen, side] = this.s.value;
-    const compact = narrow && compactPref;
+    const [ready, narrow, layoutMode, compactTab, layer, settingsOpen, side] = this.s.value;
+    const compact = isCompact({ layoutMode, isNarrow: narrow });
+    const collapsed = !compact && this.s.value[11];
     return html`
-      <div class="sv-app" data-side=${side} data-compact=${compact} data-tab=${compactTab} data-ready=${ready} data-editing=${this.s.value[10]}>
+      <div class="sv-app" data-side=${side} data-compact=${compact} data-tab=${compactTab} data-ready=${ready} data-editing=${this.s.value[10]}
+        data-collapsed=${collapsed}>
         <sv-map></sv-map>
         ${compact
           ? html`
@@ -168,7 +188,8 @@ export class SvApp extends SvElement {
               ${this.navBar(compactTab, settingsOpen)}
             `
           : html`
-              <sv-sidebar></sv-sidebar>
+              <sv-sidebar ?inert=${collapsed}></sv-sidebar>
+              ${collapsed ? this.collapsedPill() : nothing}
               <div class="sv-top-corner">${this.toolbar(false)}</div>
               <div class="sv-bottom-dock">${layer === 'radar' ? html`<sv-scrubber></sv-scrubber>` : this.aqiLegend()}</div>
             `}

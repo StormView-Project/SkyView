@@ -93,4 +93,13 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js').catch((e) => console.warn('[sw] registration failed', e));
   });
+} else if ('serviceWorker' in navigator) {
+  // Dev server: a worker left over from a production build on this address would
+  // keep serving old code, so remove it (and its caches) and reload once.
+  navigator.serviceWorker.getRegistrations().then(async (regs) => {
+    if (!regs.length) return;
+    await Promise.all(regs.map((r) => r.unregister()));
+    for (const key of await caches.keys()) await caches.delete(key);
+    location.reload();
+  });
 }

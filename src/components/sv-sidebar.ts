@@ -5,7 +5,7 @@ import { formatDistanceToNowStrict } from 'date-fns';
 import { refreshWeather } from '../lib/data';
 import { semantic, SEVERITY_HUE } from '../lib/format';
 import { haptic } from '../lib/haptics';
-import { $, store, StoreController, WIDGET_INFO, WIDGET_LABELS, type WidgetId } from '../lib/store';
+import { $, isCompact, store, StoreController, WIDGET_INFO, WIDGET_LABELS, type WidgetId } from '../lib/store';
 import type { Alert, WeatherData } from '../lib/types';
 import { SvElement } from '../lib/ui';
 import {
@@ -316,10 +316,10 @@ export class SvAlertBanner extends SvElement {
 @customElement('sv-location-header')
 export class SvLocationHeader extends SvElement {
   private s = new StoreController(this, (s) =>
-    [s.location, s.weatherLoading, s.editingWidgets, s.savedLocations.length] as const);
+    [s.location, s.weatherLoading, s.editingWidgets, s.savedLocations.length, isCompact(s), s.sidebarPosition] as const);
 
   render() {
-    const [location, loading, editing, saved] = this.s.value;
+    const [location, loading, editing, saved, compact, side] = this.s.value;
     return html`
       <header class="sv-sidebar-head">
         <m3e-button variant="text" class="sv-loc-btn" aria-label="Places"
@@ -334,6 +334,11 @@ export class SvLocationHeader extends SvElement {
               ${loading ? html`<m3e-loading-indicator class="sv-small-loader"></m3e-loading-indicator>` : html`<m3e-icon name="refresh"></m3e-icon>`}
             </m3e-icon-button>`
           : nothing}
+        ${compact
+          ? nothing
+          : html`<m3e-icon-button aria-label="Hide sidebar" title="Hide sidebar ( [ )" @click=${() => store.set({ sidebarCollapsed: true })}>
+              <m3e-icon name=${side === 'right' ? 'right_panel_close' : 'left_panel_close'}></m3e-icon>
+            </m3e-icon-button>`}
         ${location
           ? html`<m3e-icon-button aria-label=${editing ? 'Done editing' : 'Edit home screen'} variant=${editing ? 'filled' : 'standard'}
               @click=${() => store.set({ editingWidgets: !editing })}>

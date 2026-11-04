@@ -2,7 +2,7 @@ import { html, nothing, type TemplateResult } from 'lit';
 import { customElement, query, state } from 'lit/decorators.js';
 import { errorText } from '../lib/api';
 import { loadWebLLM, sendChat, WEBLLM_MODELS, webgpuAvailable } from '../lib/assistant';
-import { $, store, StoreController } from '../lib/store';
+import { $, isCompact, store, StoreController } from '../lib/store';
 import type { ChatMessage } from '../lib/types';
 import { SvElement } from '../lib/ui';
 
@@ -61,7 +61,7 @@ const SUGGESTIONS = ['Will it rain today?', 'What should I wear?', 'Any alerts r
 @customElement('sv-assistant')
 export class SvAssistant extends SvElement {
   private s = new StoreController(this, (s) =>
-    [s.assistantOpen, s.assistantProvider, s.assistantModel, s.sidebarPosition, s.isNarrow] as const);
+    [s.assistantOpen, s.assistantProvider, s.assistantModel, s.sidebarPosition, isCompact(s)] as const);
   @state() private messages: ChatMessage[] = [];
   @state() private streaming = false;
   @state() private input = '';
