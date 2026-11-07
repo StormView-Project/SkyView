@@ -9,6 +9,17 @@ export const speedUnit = () => ($().units === 'imperial' ? 'mph' : 'km/h');
 export const distUnit = () => ($().units === 'imperial' ? 'mi' : 'km');
 export const precipUnit = () => ($().units === 'imperial' ? 'in' : 'mm');
 
+/** Precipitation amount for small labels ("0.04 in", "1.2 mm"), or null when there's none. */
+export function precipAmount(v: number | null | undefined, compact = false): string | null {
+  if (v == null || !(v > 0)) return null;
+  const metric = $().units === 'metric';
+  const min = metric ? 0.1 : 0.01;
+  // Narrow cards drop the unit; "Trace" is the standard word for a measurable-but-tiny amount.
+  if (v < min) return compact ? 'Trace' : `<${min} ${precipUnit()}`;
+  const n = metric ? (v < 10 ? v.toFixed(1) : String(Math.round(v))) : v.toFixed(2);
+  return compact ? n : `${n} ${precipUnit()}`;
+}
+
 export const num = (v: number | null | undefined, digits = 0) =>
   v == null || Number.isNaN(v) ? '—' : Number(v).toFixed(digits);
 

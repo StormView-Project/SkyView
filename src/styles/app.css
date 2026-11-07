@@ -298,16 +298,16 @@ m3e-card.sv-widget {
 }
 .sv-hourly-scroll { gap: 6px; padding-bottom: 6px; }
 .sv-hour {
-  flex: 0 0 64px; display: grid; grid-template-rows: auto auto 16px 56px; justify-items: center; gap: 6px; padding: 10px 4px;
+  flex: 0 0 64px; display: grid; grid-template-rows: auto auto auto 16px; justify-items: center; align-items: center; gap: 8px; padding: 12px 4px;
   border: none; border-radius: 32px; background: var(--md-sys-color-surface-container-low); color: var(--md-sys-color-on-surface);
   cursor: pointer; transition: border-radius 300ms var(--sv-spring), background 200ms;
 }
 .sv-hour:first-child { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
 .sv-hour:hover { border-radius: 16px; }
 .sv-hour:focus-visible { outline: 3px solid var(--md-sys-color-secondary); outline-offset: 2px; }
-.sv-hour-precip { display: flex; align-items: center; font-size: 11px; color: var(--md-sys-color-primary); --m3e-icon-size: 12px; }
-.sv-hour-temp-wrap { position: relative; width: 100%; height: 56px; }
-.sv-hour-temp { position: absolute; left: 0; right: 0; text-align: center; }
+.sv-hour-precip, .sv-mini-precip, .sv-day-pop { display: flex; align-items: center; justify-content: center; gap: 1px; white-space: nowrap; --m3e-icon-size: 11px; }
+.sv-hour-precip, .sv-mini-precip { min-height: 16px; max-width: 100%; overflow: hidden; font-size: 11px; letter-spacing: 0; font-variant-numeric: tabular-nums; }
+.sv-day-pop { justify-content: flex-start; font-size: 11px; }
 
 /* Tiles inside dialogs and day detail */
 .sv-tile-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
@@ -331,7 +331,7 @@ m3e-card.sv-widget {
 .sv-day { background: var(--md-sys-color-surface-container-low); border-radius: 16px; }
 .sv-day.open { border-radius: 24px; }
 :root:not([data-press='ripple']) .sv-day:has(> .sv-day-row:active) { border-radius: 24px; }
-.sv-day-row { display: grid; grid-template-columns: 52px 28px 36px 34px 1fr 34px 20px; align-items: center; gap: 6px; height: 52px; padding: 0 8px 0 12px; border-radius: inherit; }
+.sv-day-row { display: grid; grid-template-columns: 52px 28px 58px 34px 1fr 34px 20px; align-items: center; gap: 6px; height: 52px; padding: 0 8px 0 12px; border-radius: inherit; }
 .sv-day-lo, .sv-day-hi { text-align: right; }
 .sv-range { position: relative; height: 8px; border-radius: 4px; background: var(--md-sys-color-surface-container-highest); }
 .sv-range-fill {
@@ -341,7 +341,7 @@ m3e-card.sv-widget {
 .sv-day-detail { display: flex; flex-direction: column; gap: 10px; padding: 0 12px 12px; }
 .sv-mini-hours { gap: 4px; padding-bottom: 4px; }
 .sv-mini-hour {
-  flex: 0 0 48px; display: grid; justify-items: center; gap: 4px; padding: 8px 2px; border: none; border-radius: 24px;
+  flex: 0 0 52px; display: grid; grid-template-rows: auto auto auto 16px; justify-items: center; align-items: center; gap: 4px; padding: 8px 2px; border: none; border-radius: 24px;
   background: var(--md-sys-color-surface-container-highest); color: var(--md-sys-color-on-surface); font: inherit; cursor: pointer;
   transition: border-radius 300ms var(--sv-spring), background 200ms;
 }
@@ -680,7 +680,7 @@ m3e-card.sv-preview-card { --m3e-card-padding: 0; --m3e-card-shape: 28px; overfl
   .sv-scrubber-clock { font-size: 18px; }
   .sv-scrubber-legend { display: none; }
   .sv-hero-number { font-size: 92px; }
-  .sv-day-row { grid-template-columns: 44px 26px 32px 30px 1fr 30px 20px; gap: 4px; }
+  .sv-day-row { grid-template-columns: 40px 24px 52px 28px 1fr 28px 18px; gap: 4px; }
 }
 
 /* -------------------------------------------------------- press feedback */

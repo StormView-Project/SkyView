@@ -3,7 +3,7 @@ import { customElement, property, state } from 'lit/decorators.js';
 import { addDays, endOfDay, format, startOfDay } from 'date-fns';
 import { api, errorText } from '../../lib/api';
 import {
-  aqiCategory, currentHourIndex, distUnit, fmtTime, precipUnit, semantic, speedUnit, tempUnit, toISODateLocal,
+  aqiCategory, currentHourIndex, precipAmount, distUnit, fmtTime, precipUnit, semantic, speedUnit, tempUnit, toISODateLocal,
   uvInfo, weatherVisual, windLabel,
 } from '../../lib/format';
 import { $, DETAILS_FIELD_LABELS, StoreController } from '../../lib/store';
@@ -59,6 +59,17 @@ export class SvCurrent extends SvThemed {
 
 /* ============================================================== hourly */
 
+/**
+ * The precipitation line on hourly cards and 7-day rows: the amount when there is
+ * some, nothing when it's dry. NWS gives no amounts, so there the chance stands in.
+ * Always takes up its slot, so cards stay the same height.
+ */
+function precipLabel(amount: number | null, prob: number | null, cls: string, compact = false) {
+  const a = precipAmount(amount, compact);
+  const text = a ?? (amount == null && (prob ?? 0) > 10 ? `${prob}%` : '');
+  return html`<span class="sv-label-small sv-rain ${cls}">${text ? html`<m3e-icon name="water_drop" filled></m3e-icon>${text}` : ''}</span>`;
+}
+
 function hourRows(h: Hour) {
   const rows: { icon: string; hue: string; label: string; value: string; valueHue?: string }[] = [];
   if (has(h.feelsLike)) rows.push({ icon: 'thermostat', hue: '#a78bfa', label: 'Feels Like', value: `${h.feelsLike}${tempUnit()}` });
@@ -100,19 +111,16 @@ export class SvHourly extends SvThemed {
     const start = currentHourIndex(this.data.hourly);
     const hours = this.data.hourly.slice(start, start + 24);
     if (!hours.length) return nothing;
-    const temps = hours.map((h) => h.temp ?? 0);
-    const min = Math.min(...temps), max = Math.max(...temps);
     const sel = this.selected;
     return html`
       ${widget('hourly', 'Hourly', 'schedule', html`
         <div class="sv-hourly-scroll" @wheel=${wheelToHorizontal}>
           ${hours.map((h, i) => {
-            const lift = max === min ? 50 : (((h.temp ?? min) - min) / (max - min)) * 100;
             return html`<button class="sv-hour sv-press" @click=${() => { this.selected = h; this.open = true; }} title="View hour details">
               <span class="sv-label-medium">${i === 0 ? 'Now' : format(h.time, 'ha')}</span>
-              ${wxIcon(h.conditionCode, h.isDay, 26)}
-              <span class="sv-hour-precip">${(h.precipProb ?? 0) > 10 ? html`<m3e-icon name="water_drop" filled></m3e-icon>${h.precipProb}%` : ''}</span>
-              <span class="sv-hour-temp-wrap"><span class="sv-title-medium sv-hour-temp" style="bottom:${lift * 0.5}%">${h.temp ?? '—'}°</span></span>
+              <span class="sv-title-medium sv-hour-temp">${h.temp ?? '—'}°</span>
+              ${wxIcon(h.conditionCode, h.isDay, 28)}
+              ${precipLabel(h.precipitation, h.precipProb, 'sv-hour-precip', true)}
             </button>`;
           })}
         </div>`)}
@@ -179,9 +187,9 @@ function dayDetail(day: Day, hourly: Hour[], onPick: (h: Hour) => void): Templat
         ? html`<div class="sv-mini-hours" @wheel=${wheelToHorizontal}>
             ${hours.map((h) => html`<button class="sv-mini-hour sv-press" title="View hour details" @click=${() => onPick(h)}>
               <span class="sv-label-small">${format(h.time, 'ha').toLowerCase()}</span>
-              ${wxIcon(h.conditionCode, h.isDay, 20)}
-              ${(h.precipProb ?? 0) > 10 ? html`<span class="sv-label-small sv-rain">${h.precipProb}%</span>` : html`<span></span>`}
-              <span class="sv-title-small">${h.temp}°</span>
+              <span class="sv-title-small">${h.temp ?? '—'}°</span>
+              ${wxIcon(h.conditionCode, h.isDay, 22)}
+              ${precipLabel(h.precipitation, h.precipProb, 'sv-mini-precip', true)}
             </button>`)}
           </div>`
         : html`<p class="sv-body-small sv-muted">No hourly data for this day</p>`}
@@ -219,7 +227,7 @@ export class SvDaily extends SvThemed {
             <button class="sv-day-row sv-press" aria-expanded="false" @click=${toggleCollapse}>
               <span class="sv-title-small sv-day-name">${i === 0 ? 'Today' : format(d.date, 'EEE')}</span>
               ${wxIcon(d.conditionCode, true, 24)}
-              <span class="sv-label-medium sv-rain sv-day-pop">${(d.precipProb ?? 0) > 10 ? `${d.precipProb}%` : ''}</span>
+              ${precipLabel(d.precipSum, d.precipProb, 'sv-day-pop')}
               <span class="sv-title-small sv-muted sv-day-lo">${d.tempMin ?? '—'}°</span>
               <span class="sv-range"><span class="sv-range-fill" style="left:${left}%;width:${width}%"></span></span>
               <span class="sv-title-small sv-day-hi">${d.tempMax ?? '—'}°</span>
